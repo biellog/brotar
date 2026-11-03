@@ -74,8 +74,8 @@ No repositório: **Settings → Secrets and variables → Actions**
 ### 4. Crie o banco (substitui o SQL Editor)
 Aba **Actions → 🗄️ Criar/atualizar banco Supabase → Run workflow**.
 Em ~1 minuto todas as tabelas, regras de segurança e funções estarão criadas.
-(As migrações antigas do Brotar continuam na pasta só para o histórico do banco bater; as tabelas
-do Fica Sóbrio têm nomes diferentes e não conflitam.)
+Se o seu Supabase ainda tiver as tabelas do app de teste antigo (Brotar), elas são apagadas
+automaticamente nessa mesma execução.
 Sempre que algo mudar em `supabase/migrations`, ele roda sozinho.
 
 ### 5. Gere o APK

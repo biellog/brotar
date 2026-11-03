@@ -4,6 +4,20 @@
 -- Você NÃO precisa abrir o SQL Editor do Supabase.
 -- =============================================================
 
+-- ---------- LIMPEZA: remove o app de teste antigo (Brotar), se existir ----------
+drop trigger if exists on_auth_user_created on auth.users;
+drop table if exists
+  public.app_releases, public.relapses, public.milestones_claimed, public.daily_actions,
+  public.points_ledger, public.user_items, public.shop_items, public.profiles
+  cascade;
+drop function if exists
+  public.milestone_bonus, public.checkin_points, public.game_points, public.daily_limit,
+  public._uid, public._lock_profile, public._today, public._balance, public._days, public._bump,
+  public.handle_new_user, public.get_state, public.start_journey, public.update_profile,
+  public.daily_checkin, public.submit_game_score, public.claim_ad_reward, public.buy_item,
+  public.equip_theme, public.reset_sobriety, public.delete_my_account
+  cascade;
+
 -- ---------- PERFIS ----------
 create table if not exists public.perfis (
   id                    uuid primary key references auth.users(id) on delete cascade,
