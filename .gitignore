@@ -10,3 +10,6 @@ playwright-report/
 android/app/release/
 .DS_Store
 dist-sb/
+*.p12
+*.zip
+brotar-assinatura*

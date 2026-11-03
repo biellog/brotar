@@ -36,3 +36,14 @@ describe('regras', () => {
   });
   it('marcos em ordem crescente', () => { expect([...MILESTONES].sort((a, b) => a - b)).toEqual(MILESTONES); });
 });
+
+import { normalizeSupabaseUrl } from '../../src/lib/config.js';
+describe('URL do Supabase', () => {
+  it('aceita a URL colada de vários jeitos', () => {
+    for (const u of ['https://abc.supabase.co', 'https://abc.supabase.co/', 'https://abc.supabase.co/rest/v1/', ' https://abc.supabase.co/rest/v1 ']) {
+      expect(normalizeSupabaseUrl(u)).toBe('https://abc.supabase.co');
+    }
+    expect(normalizeSupabaseUrl('')).toBe('');
+    expect(normalizeSupabaseUrl('lixo')).toBe('');
+  });
+});

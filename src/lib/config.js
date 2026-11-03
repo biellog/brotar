@@ -3,7 +3,11 @@
 // NUNCA coloque a service_role key aqui.
 const env = import.meta.env ?? {};
 
-export const SUPABASE_URL = String(env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+// Aceita a URL colada de várias formas (com barra, com /rest/v1/...): usa só a origem.
+export function normalizeSupabaseUrl(raw) {
+  try { return new URL(String(raw ?? '').trim()).origin; } catch { return ''; }
+}
+export const SUPABASE_URL = normalizeSupabaseUrl(env.VITE_SUPABASE_URL);
 export const SUPABASE_ANON_KEY = String(env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 // URL pública do site (GitHub Pages) — destino dos links de confirmação/redefinição de senha.
 export const SITE_URL = env.VITE_SITE_URL || (globalThis.location ? location.origin + location.pathname : '');
