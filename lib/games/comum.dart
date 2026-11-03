@@ -7,7 +7,7 @@ import '../data/repo.dart';
 import '../theme.dart';
 import '../widgets/compartilhar.dart';
 
-/// Botão de ligar/desligar a música (aparece em todos os jogos e no SOS).
+/// Botão de som (jogos, SOS e Perfil): abre as configurações de música e volume.
 class BotaoMusica extends StatelessWidget {
   const BotaoMusica({super.key});
 
@@ -15,9 +15,104 @@ class BotaoMusica extends StatelessWidget {
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
         valueListenable: Musica.mudo,
         builder: (_, mudo, _) => IconButton(
-          tooltip: mudo ? 'Ligar música' : 'Desligar música',
+          tooltip: 'Som e música',
           icon: Icon(mudo ? Icons.music_off : Icons.music_note),
-          onPressed: Musica.alternarMudo,
+          onPressed: () => abrirConfigSom(context),
+        ),
+      );
+}
+
+/// Painel com liga/desliga da música e volumes de música e efeitos.
+Future<void> abrirConfigSom(BuildContext context) {
+  Repo.log('tela', {'nome': 'config_som'});
+  return showModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => const _ConfigSom(),
+  );
+}
+
+class _ConfigSom extends StatelessWidget {
+  const _ConfigSom();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('🎵 Som e música', style: t.titleLarge),
+            const SizedBox(height: 8),
+            ValueListenableBuilder<bool>(
+              valueListenable: Musica.mudo,
+              builder: (_, mudo, _) => SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Música de fundo'),
+                subtitle: const Text('Trecho calmo, em loop'),
+                value: !mudo,
+                onChanged: (ligada) => Musica.definirMudo(!ligada),
+              ),
+            ),
+            _ControleVolume(
+              icone: Icons.music_note,
+              rotulo: 'Volume da música',
+              valor: Musica.volumeMusica,
+              aoMudar: Musica.definirVolumeMusica,
+            ),
+            const SizedBox(height: 8),
+            _ControleVolume(
+              icone: Icons.volume_up,
+              rotulo: 'Volume dos efeitos (jogos)',
+              valor: Musica.volumeEfeitos,
+              aoMudar: Musica.definirVolumeEfeitos,
+              aoSoltar: () => Musica.efeito(Efeito.bolhaCerta), // amostra do volume
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ControleVolume extends StatelessWidget {
+  final IconData icone;
+  final String rotulo;
+  final ValueNotifier<double> valor;
+  final Future<void> Function(double) aoMudar;
+  final VoidCallback? aoSoltar;
+  const _ControleVolume({
+    required this.icone,
+    required this.rotulo,
+    required this.valor,
+    required this.aoMudar,
+    this.aoSoltar,
+  });
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<double>(
+        valueListenable: valor,
+        builder: (_, v, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(icone, size: 20, color: Colors.white70),
+              const SizedBox(width: 8),
+              Expanded(child: Text(rotulo)),
+              Text('${(v * 100).round()}%', style: const TextStyle(color: Cores.ouro)),
+            ]),
+            Slider(
+              value: v,
+              onChanged: aoMudar,
+              onChangeEnd: (_) {
+                Musica.salvarVolumes();
+                aoSoltar?.call();
+              },
+            ),
+          ],
         ),
       );
 }

@@ -18,7 +18,7 @@ O APK é compilado **pelo GitHub** — você não precisa instalar nada no compu
 | 🎯 Missões diárias | Check-in (+20 XP), jogar, beber água (+5 XP) |
 | 🏅 15 conquistas | 24h, 7 dias, 30, 90, 365 dias, recordes no jogo, fissuras vencidas… |
 | 🎮 3 jogos | **Desvia da Tempestade** (desvie de ⛈️⚡🌪️, pegue 💧⭐🍀), **Bolhas da Calma** (estoure bolhas em 45 s) e **Memória Zen** (8 pares). Sem bebida nem cigarro na tela, para não gerar gatilho. 10 pontos = 1 XP |
-| 🎵 Música | Toca nos jogos e no SOS. Coloque arquivos `.mp3`/`.ogg` em `assets/musica/`, sem mexer em código |
+| 🎵 Som | Música calma em loop no app inteiro (pausa quando o app sai da tela) e efeitos nos jogos: erro na Tempestade, carta virando na Memória, bolha certa e errada nas Bolhas. Volume da música e dos efeitos ajustáveis em **Perfil → Som e música** ou no botão 🎵 |
 | 🚀 Atualizações | O app consulta a tabela `versoes_app` no Supabase: mostra aviso, botão **Atualizar** e notificação (verificação a cada ~4 h, mesmo com o app fechado) |
 | 🆘 SOS Fissura | Registra intensidade e gatilho, respiração 4-4-6, cronômetro, CVV 188, CAPS (136), AA/NA, SAMU 192 |
 | 📓 Check-in diário | Humor, nível de vontade, diário |

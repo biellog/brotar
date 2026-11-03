@@ -1,3 +1,7 @@
-Coloque aqui as músicas do app (.mp3, .ogg, .m4a ou .wav).
-Elas entram no APK automaticamente e tocam em loop nos jogos e no SOS.
-Não precisa mudar código: basta adicionar o arquivo e dar push.
+Música de fundo do app (toca em loop em todas as telas).
+
+calma.ogg = trecho calmo (3:21,9 a 3:43,7) da música enviada, 12 compassos a 132,5 BPM,
+com transição suave na emenda do loop e volume reduzido (-22 dBFS RMS).
+
+Para trocar: substitua calma.ogg (ou adicione outro .ogg/.mp3; o primeiro em ordem
+alfabética é o que toca). Não precisa mexer no código.

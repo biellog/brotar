@@ -18,8 +18,32 @@ Future<void> main() async {
   runApp(const FicaSobrioApp());
 }
 
-class FicaSobrioApp extends StatelessWidget {
+class FicaSobrioApp extends StatefulWidget {
   const FicaSobrioApp({super.key});
+
+  @override
+  State<FicaSobrioApp> createState() => _FicaSobrioAppState();
+}
+
+class _FicaSobrioAppState extends State<FicaSobrioApp> {
+  late final AppLifecycleListener _ciclo;
+
+  @override
+  void initState() {
+    super.initState();
+    Musica.tocar(); // música calma em todo o app
+    // pausa a música quando o app sai da tela e retoma quando volta
+    _ciclo = AppLifecycleListener(
+      onHide: () => Musica.segundoPlano(true),
+      onShow: () => Musica.segundoPlano(false),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ciclo.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

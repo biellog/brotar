@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../data/atualizacao.dart';
 import '../data/repo.dart';
+import '../games/comum.dart';
 import '../logic/progresso.dart';
 import '../theme.dart';
 import '../widgets/compartilhar.dart';
@@ -281,6 +282,16 @@ class _PerfilScreenState extends State<PerfilScreen> {
             ]),
           ),
           const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.music_note),
+              title: const Text('Som e música'),
+              subtitle: const Text('Ligar/desligar a música e ajustar os volumes'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => abrirConfigSom(context),
+            ),
+          ),
+          const SizedBox(height: 8),
           Card(
             child: ListTile(
               leading: const Icon(Icons.system_update),

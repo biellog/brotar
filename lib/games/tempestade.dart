@@ -123,14 +123,12 @@ class _TempestadeScreenState extends State<TempestadeScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _ticker = createTicker(_tick)..start();
-    Musica.tocar();
     Repo.log('jogo_iniciado', {'jogo': 'tempestade'});
   }
 
   @override
   void dispose() {
     _ticker.dispose();
-    Musica.parar();
     super.dispose();
   }
 
@@ -142,6 +140,7 @@ class _TempestadeScreenState extends State<TempestadeScreen> with SingleTickerPr
       _motor.passo(dt);
       switch (_motor.ultimoEfeito) {
         case 'dano':
+          Musica.efeito(Efeito.erro);
           HapticFeedback.heavyImpact();
           _flashDano = true;
           Future.delayed(const Duration(milliseconds: 150), () {

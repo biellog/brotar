@@ -60,7 +60,6 @@ class _MemoriaScreenState extends State<MemoriaScreen> {
   void initState() {
     super.initState();
     _comecar();
-    Musica.tocar();
   }
 
   void _comecar() {
@@ -78,13 +77,16 @@ class _MemoriaScreenState extends State<MemoriaScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    Musica.parar();
     super.dispose();
   }
 
   Future<void> _tocar(int i) async {
     if (_travado) return;
+    final abertasAntes = _m.virada.length + _m.achadas.length;
     final r = _m.virar(i);
+    if (_m.virada.length + _m.achadas.length != abertasAntes || r != null) {
+      Musica.efeito(Efeito.carta); // virou uma carta
+    }
     setState(() {});
     if (r == 'par') {
       HapticFeedback.mediumImpact();

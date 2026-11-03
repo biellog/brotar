@@ -30,6 +30,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/musica/
+    - assets/sons/
 
 flutter_launcher_icons:
   android: true

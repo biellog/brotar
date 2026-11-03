@@ -95,14 +95,12 @@ class _BolhasScreenState extends State<BolhasScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _ticker = createTicker(_tick)..start();
-    Musica.tocar();
     Repo.log('jogo_iniciado', {'jogo': 'bolhas'});
   }
 
   @override
   void dispose() {
     _ticker.dispose();
-    Musica.parar();
     super.dispose();
   }
 
@@ -152,8 +150,14 @@ class _BolhasScreenState extends State<BolhasScreen> with SingleTickerProviderSt
                 d.localPosition.dy / box.maxHeight,
                 box.maxWidth / box.maxHeight,
               );
-              if (r == 'boa') HapticFeedback.selectionClick();
-              if (r == 'ruim') HapticFeedback.heavyImpact();
+              if (r == 'boa') {
+                Musica.efeito(Efeito.bolhaCerta);
+                HapticFeedback.selectionClick();
+              }
+              if (r == 'ruim') {
+                Musica.efeito(Efeito.bolhaErrada);
+                HapticFeedback.heavyImpact();
+              }
             },
             child: Stack(children: [
               Positioned.fill(child: CustomPaint(painter: _PintorBolhas(_m, _pintor))),
