@@ -71,7 +71,7 @@ test('minijogo termina e paga sementes', async ({ page }) => {
   await seed(page, { days: 1 });
   await page.goto('./?demo');
   await page.getByRole('button', { name: /Jogar/ }).first().click();
-  await page.getByTestId('play').click();
+  await page.getByTestId('play-chuva').click();
   const canvas = page.locator('canvas.game');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
@@ -85,8 +85,69 @@ test('minijogo termina e paga sementes', async ({ page }) => {
   const score = Number((await page.getByTestId('game-over').locator('.big-num').textContent()).replace(/\D/g, ''));
   await page.getByRole('button', { name: 'Voltar' }).click();
   await expect(page.getByTestId('game')).toHaveCount(0);
-  await expect(page.getByTestId('play')).toBeVisible();
+  await expect(page.getByTestId('play-chuva')).toBeVisible();
   await expect(page.getByTestId('balance')).toContainText(String(100 + Math.min(Math.floor(score / 50), 20)));
+});
+
+test('Chuva Boa: o vaso segue o mouse sem clicar e sem atraso', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); // desktop com mouse
+  const page = await ctx.newPage();
+  await seed(page, { days: 1 });
+  await page.goto('./?demo');
+  await page.getByRole('button', { name: /Jogar/ }).first().click();
+  await page.getByTestId('play-chuva').click();
+  const box = await page.locator('canvas.game').boundingBox();
+  for (const frac of [0.25, 0.8, 0.5]) {
+    await page.mouse.move(box.x + box.width * frac, box.y + box.height / 2); // só move, sem apertar
+    await page.waitForTimeout(60); // ~3 quadros
+    const x = await page.evaluate(() => globalThis.__brotarGame.player.x);
+    expect(Math.abs(x - 360 * frac)).toBeLessThan(2);
+  }
+  await ctx.close();
+});
+
+test('Jardim da Memória: vira cartas e termina', async ({ page }) => {
+  await seed(page, { days: 1 });
+  await page.goto('./?demo');
+  await page.getByRole('button', { name: /Jogar/ }).first().click();
+  await page.getByTestId('play-memoria').click();
+  const cards = page.locator('.mem-card');
+  await expect(cards).toHaveCount(16);
+  // acerta um par usando o estado do jogo
+  const [a, b] = await page.evaluate(() => {
+    const c = globalThis.__brotarGame.cards; const j = c.findIndex((x, k) => k > 0 && x.icon === c[0].icon); return [0, j];
+  });
+  await cards.nth(a).click();
+  await cards.nth(b).click();
+  await expect(page.locator('.mem-card.matched')).toHaveCount(2);
+  await expect(page.getByTestId('game-over')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('game-over')).toContainText('Pares: 1/8');
+});
+
+test('Colheita Feliz: colher frutos dá pontos', async ({ page }) => {
+  await seed(page, { days: 1 });
+  await page.goto('./?demo');
+  await page.getByRole('button', { name: /Jogar/ }).first().click();
+  await page.getByTestId('play-colheita').click();
+  await expect(page.locator('.hole')).toHaveCount(9);
+  const fruit = page.locator('.hole.up').filter({ hasNotText: '🐛' }).first();
+  await fruit.waitFor({ timeout: 4000 });
+  await fruit.dispatchEvent('pointerdown');
+  await expect.poll(() => page.evaluate(() => globalThis.__brotarGame.score)).toBeGreaterThan(0);
+  await expect(page.getByTestId('game-over')).toBeVisible({ timeout: 10_000 });
+});
+
+test('botão de som liga/desliga e é lembrado', async ({ page }) => {
+  await seed(page, { days: 1 });
+  await page.goto('./');
+  await page.getByRole('button', { name: /Jogar/ }).first().click();
+  const btn = page.getByTestId('sound-toggle');
+  await expect(btn).toHaveText('🔊');
+  await btn.click();
+  await expect(btn).toHaveText('🔇');
+  await page.reload();
+  await page.getByRole('button', { name: /Jogar/ }).first().click();
+  await expect(page.getByTestId('sound-toggle')).toHaveText('🔇');
 });
 
 test('SOS abre respiração e contatos de ajuda', async ({ page }) => {

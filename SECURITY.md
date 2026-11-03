@@ -24,6 +24,7 @@ Relatório da revisão de segurança feita em 03/11/2026 e dos controles impleme
 | Backup do app expondo token de sessão | `allowBackup=false`, `usesCleartextTraffic=false`, depuração do WebView desligada | revisão manual |
 | Chave de assinatura vazar | Keystore só em Secrets, decodificado em `$RUNNER_TEMP` e apagado depois; `*.jks` no `.gitignore` | revisão manual |
 | CI com permissões demais | `permissions: contents: read` por padrão; escrita só nos jobs de Pages/Release | revisão manual |
+| Versão falsa para enganar usuários (link malicioso de "atualização") | `app_releases` só aceita escrita pela service_role (CI); URL obrigatoriamente `https://`; o app também valida a URL | `db.test.js` › app_releases, `updates.test.js` |
 | LGPD (dados de saúde) | Exportar dados e excluir conta no app; política de privacidade | `db.test.js`, `supabase.spec.js` |
 
 ## Testes de mutação

@@ -100,6 +100,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '1.0.0-dev' }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
@@ -122,5 +123,34 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { name: brotar-android, path: out }
-      - uses: softprops/action-gh-release@v2
-        with: { files: 'out/**/*' }
+      - name: Notas da versão (mensagem da tag)
+        env: { TAG: '${{ github.ref_name }}', GH_TOKEN: '${{ github.token }}' }
+        run: |
+          MSG=$(gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" --jq '.object' | jq -r 'if .type=="tag" then .url else "" end' | xargs -r gh api --jq '.message' 2>/dev/null || true)
+          [ -n "$MSG" ] || MSG="Melhorias e correções."
+          printf '%s' "$MSG" > notes.txt
+      - id: gh
+        uses: softprops/action-gh-release@v2
+        with:
+          files: 'out/**/*.apk'
+          body_path: notes.txt
+      - name: Registrar versão no Supabase (aviso de atualização no app)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RELEASE_URL: ${{ vars.UPDATE_URL || steps.gh.outputs.url }}
+          VERSION_NAME: ${{ github.ref_name }}
+          VERSION_CODE: ${{ github.run_number }}
+          MANDATORY: ${{ vars.UPDATE_MANDATORY || 'false' }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SERVICE_KEY" ]; then
+            echo "::warning::SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY não configurados: o app não será avisado desta versão."
+            exit 0
+          fi
+          jq -n --rawfile notes notes.txt --arg vn "$VERSION_NAME" --arg url "$RELEASE_URL" \
+                --argjson vc "$VERSION_CODE" --argjson m "$MANDATORY" \
+                '{platform:"android", version_code:$vc, version_name:$vn, notes:($notes|.[0:1000]), url:$url, mandatory:$m}' \
+          | curl -fsS -X POST "$SUPABASE_URL/rest/v1/app_releases" \
+              -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" \
+              -H "Content-Type: application/json" -H "Prefer: return=minimal" --data @-
+          echo "Versão $VERSION_NAME (build $VERSION_CODE) registrada: o app vai avisar os usuários."

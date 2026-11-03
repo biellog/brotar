@@ -133,3 +133,38 @@ canvas.game { flex: 1; width: 100%; max-width: 480px; margin: 0 auto; touch-acti
 .game-over h2 { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- jogos: menu */
+.game-card { flex-direction: row; align-items: center; gap: 12px; }
+.game-icon { font-size: 2.6rem; font-family: var(--emoji); }
+.game-info { flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.hud .hud-btn { padding: 6px 10px; }
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.stage canvas.game { flex: 1; }
+.notes { white-space: pre-line; background: var(--bg); border-radius: 12px; padding: 10px; }
+
+/* ---------- Jardim da Memória */
+.stage-memoria { background: linear-gradient(#e8f5e9, #c8e6c9); padding: 12px; }
+.mem-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: min(100%, 440px, calc((100dvh - 110px) * 0.8)); }
+.mem-card { aspect-ratio: 3 / 4; border: 0; padding: 0; background: none; cursor: pointer; perspective: 600px; }
+.mem-inner { position: relative; display: block; width: 100%; height: 100%; transition: transform .35s; transform-style: preserve-3d; }
+.mem-card.open .mem-inner { transform: rotateY(180deg); }
+.mem-back, .mem-front { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; backface-visibility: hidden; font-family: var(--emoji); box-shadow: 0 3px 8px rgba(0,0,0,.15); }
+.mem-back { background: linear-gradient(135deg, #43a047, #1b5e20); font-size: clamp(20px, 6vw, 32px); }
+.mem-front { background: #fff; transform: rotateY(180deg); font-size: clamp(28px, 9vw, 46px); }
+.mem-card.matched .mem-front { background: #fff8e1; outline: 3px solid #ffca28; }
+
+/* ---------- Colheita Feliz */
+.stage-colheita { background: linear-gradient(#bfe9ff 0%, #dff5d8 35%, #8bc34a 100%); padding: 16px; }
+.harvest { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: min(100%, 420px, calc((100dvh - 120px) * 0.95)); }
+.harvest.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.hole { position: relative; aspect-ratio: 1; border: 0; border-radius: 50%; cursor: pointer; overflow: visible; touch-action: manipulation; padding: 0;
+  background: radial-gradient(ellipse 70% 38% at 50% 72%, #3e2723 0 60%, transparent 62%), radial-gradient(circle at 50% 60%, #a1887f 0 58%, #8d6e63 59% 70%, transparent 71%); }
+.hole:active { transform: scale(.96); }
+.crop { position: absolute; left: 50%; bottom: 22%; transform: translate(-50%, 30%) scale(0); font-size: min(16vw, 72px); line-height: 1; font-family: var(--emoji); transition: transform .12s ease-out; pointer-events: none; filter: drop-shadow(0 4px 3px rgba(0,0,0,.25)); }
+.hole.up .crop { transform: translate(-50%, 0) scale(1); }
+.float { position: absolute; left: 50%; top: 0; transform: translateX(-50%); font-weight: 800; color: #1b5e20; animation: rise .7s forwards; pointer-events: none; font-family: system-ui, var(--emoji); }
+.float.gold { color: #f57f17; }
+.float.bad { font-size: 1.6rem; }
+@keyframes rise { to { transform: translate(-50%, -40px); opacity: 0; } }

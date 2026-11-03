@@ -10,15 +10,20 @@ O Brotar é um app (Android + site) que transforma a sobriedade num jogo leve e 
 - **Jardim que cresce:** a planta principal muda de fase (semente → broto → … → árvore florida) com os dias.
 - **Sementes (pontos):** ganhe com o check-in diário (10–30), **marcos** (1, 3, 7, 14, 30, 60, 90, 180 e 365 dias, até +2000), o minijogo e anúncios premiados.
 - **Loja:** compre plantas, bichinhos e temas (Noite estrelada, Outono, Aurora) para o seu jardim.
-- **Minijogo "Chuva Boa":** 45 s para pegar gotas, sóis e sementes e desviar das nuvens de tempestade (os gatilhos). Serve para distrair a vontade.
+- **3 minijogos** para distrair a vontade (até 3 partidas premiadas por dia, somando todos):
+  - **Chuva Boa** 🌧️: pegue gotas, sóis e sementes com o vasinho e desvie das tempestades (os gatilhos).
+  - **Jardim da Memória** 🃏: encontre os 8 pares de cartas. É calmo e ajuda a focar.
+  - **Colheita Feliz** 🧺: toque nos frutos que brotam da terra, mas não nas pragas.
+- **Sons e música suave** sintetizados no próprio app (sem arquivos de áudio), com botão para desligar.
+- **Aviso de atualização** no app Android, alimentado pelo Supabase.
 - **Botão SOS:** respiração guiada, CVV 188, SAMU 192, AA, NA e CAPS AD.
 - **Recaída sem punição:** a contagem recomeça, mas sementes, itens e marcos ficam.
 - **Conta na nuvem (Supabase)** ou **modo sem conta** (dados só no aparelho).
 - **Privacidade:** exportar os dados e excluir a conta pelo próprio app (LGPD e exigência do Google Play).
 
-| Boas-vindas | Jardim | Jogo | Loja | Marcos | SOS | Tema Noite |
-|---|---|---|---|---|---|---|
-| ![](docs/screenshots/01-boas-vindas.png) | ![](docs/screenshots/02-jardim.png) | ![](docs/screenshots/03-jogo.png) | ![](docs/screenshots/04-loja.png) | ![](docs/screenshots/05-marcos.png) | ![](docs/screenshots/06-sos.png) | ![](docs/screenshots/07-tema-noite.png) |
+| Boas-vindas | Jardim | Jogos | Chuva Boa | Memória | Colheita | Loja | Marcos | SOS | Tema Noite |
+|---|---|---|---|---|---|---|---|---|---|
+| ![](docs/screenshots/01-boas-vindas.png) | ![](docs/screenshots/02-jardim.png) | ![](docs/screenshots/03a-jogos.png) | ![](docs/screenshots/03-jogo.png) | ![](docs/screenshots/03b-memoria.png) | ![](docs/screenshots/03c-colheita.png) | ![](docs/screenshots/04-loja.png) | ![](docs/screenshots/05-marcos.png) | ![](docs/screenshots/06-sos.png) | ![](docs/screenshots/07-tema-noite.png) |
 
 ## Tecnologia
 
@@ -78,7 +83,33 @@ base64 -w0 brotar-release.jks
 
    Crie os **Secrets** `ANDROID_KEYSTORE_BASE64` (a saída do comando acima), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`brotar`) e `ANDROID_KEY_PASSWORD`. Com eles, o CI também gera `app-release.apk` e `app-release.aab`. Para publicar um release com os arquivos anexados, crie uma tag `v1.0.0`.
 
-## 3. AdMob
+## 3. Aviso de atualização (Supabase)
+
+Como funciona:
+1. Você publica uma versão nova criando uma **tag** (com a mensagem virando a "novidade" mostrada no app):
+
+```bash
+git tag -a v1.1.0 -m "Novos jogos e sons!"
+```
+
+```bash
+git push origin v1.1.0
+```
+
+2. O GitHub Actions compila o APK, cria o **Release** com o APK anexado e registra a versão na tabela `app_releases` do Supabase.
+3. O app Android compara a versão instalada com a do banco **ao abrir**, **ao voltar do segundo plano** e **ao vivo** (Supabase Realtime). Se houver versão nova, mostra "🌱 Nova versão disponível" com o botão **Atualizar agora**.
+
+Configuração (uma vez só):
+- Rode também a migração `supabase/migrations/20261104000000_app_releases.sql` no SQL Editor.
+- Crie o **Secret** `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API → service_role). Ela fica **só no GitHub**, nunca no app.
+- Opcional: a variável `UPDATE_URL` define para onde o botão leva. O padrão é a página do Release no GitHub; depois que o app estiver na Play Store, use `https://play.google.com/store/apps/details?id=app.brotar.jardim`.
+- Opcional: `UPDATE_MANDATORY=true` torna a atualização obrigatória (o aviso não pode ser fechado).
+
+⚠️ **Assinatura:** para uma versão nova instalar **por cima** da antiga sem perder os dados, todas precisam ser assinadas com a **mesma chave**. Configure o keystore de release (passo 2.5) **antes** de distribuir o app. APKs de debug do CI são assinados com chaves diferentes a cada build, então a pessoa precisaria desinstalar o app para atualizar.
+
+> Isso é um aviso **dentro do app**. Para uma notificação push com o app **fechado**, é preciso adicionar o Firebase Cloud Messaging (dá para integrar com o Supabase por uma Edge Function).
+
+## 4. AdMob
 
 O app já vem com:
 - **Banner** na parte de baixo, escondido durante o jogo.
@@ -92,7 +123,7 @@ Checklist no console do AdMob:
 3. Defina a classificação máxima de conteúdo dos anúncios como **T** (Teen) ou mais restrita.
 4. Publique o `app-ads.txt` no site do desenvolvedor informado na Play Store.
 
-## 4. Google Play: pontos de atenção
+## 5. Google Play: pontos de atenção
 
 - **Política de privacidade:** `https://SEU-USUARIO.github.io/brotar/privacidade.html`. Preencha os campos entre colchetes antes de publicar.
 - **Exclusão de conta:** existe dentro do app (Perfil → Excluir minha conta). Informe isso no formulário "Segurança dos dados".
@@ -108,9 +139,9 @@ npm run test:all
 
 | Suíte | O que cobre |
 |---|---|
-| `npm test` (31) | regras de pontos, motor do jogo (determinismo, anti speed-hack), backend local, helper anti-XSS |
-| `npm run test:db` (27) | migração real no Postgres: **RLS**, privilégios, injeção de SQL, **gasto duplo em corrida**, limites diários, exclusão LGPD |
-| `npm run test:e2e` (13) | fluxo completo no navegador (Pixel 7), **XSS**, **CSP**, dados locais adulterados, segredos no bundle |
+| `npm test` (46) | regras de pontos, motores dos 3 jogos (determinismo, anti speed-hack, controle sem atraso), aviso de atualização, backend local, helper anti-XSS |
+| `npm run test:db` (29) | migração real no Postgres: **RLS**, privilégios, injeção de SQL, **gasto duplo em corrida**, limites diários, exclusão LGPD |
+| `npm run test:e2e` (17) | fluxo completo no navegador (Pixel 7), os 3 jogos, mouse sem atraso, som, **XSS**, **CSP**, dados locais adulterados, segredos no bundle |
 | `npm run test:e2e:supabase` (3) | app em modo conta falando com a migração real (cadastro, login, compra, cliente adulterado, exclusão) |
 
 Os testes de banco precisam de um Postgres em `DATABASE_URL` (padrão `postgresql://brotar_test:brotar_test@localhost:5432/brotar_test`).

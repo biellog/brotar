@@ -48,13 +48,46 @@ await p.screenshot({ path: `${OUT}/07-tema-noite.png` }); await p.close();
 p = await page(garden);
 await p.goto(BASE);
 await p.getByRole('button', { name: /Jogar/ }).first().click();
-await p.getByTestId('play').click();
+await p.screenshot({ path: `${OUT}/03a-jogos.png` });
+await p.getByTestId('play-chuva').click();
 const c = p.locator('canvas.game'); const box = await c.boundingBox();
 for (let i = 0; i < 40; i++) {
   await p.mouse.move(box.x + box.width * (0.5 + 0.35 * Math.sin(i / 4)), box.y + box.height * 0.9);
   await p.mouse.down(); await p.waitForTimeout(90);
 }
 await p.screenshot({ path: `${OUT}/03-jogo.png` }); await p.close();
+
+// Jardim da Memória no meio da partida: alguns pares achados e uma carta aberta
+p = await page(garden);
+await p.goto(BASE);
+await p.getByRole('button', { name: /Jogar/ }).first().click();
+await p.getByTestId('play-memoria').click();
+await p.waitForTimeout(300);
+const cards = p.locator('.mem-card');
+const icons = await cards.evaluateAll((els) => els.map((e) => e.querySelector('.mem-front').textContent));
+const done = new Set();
+for (let i = 0, pairs = 0; i < icons.length && pairs < 3; i++) {
+  if (done.has(i)) continue;
+  const j = icons.findIndex((x, k) => k !== i && x === icons[i]);
+  done.add(i); done.add(j); pairs++;
+  await cards.nth(i).click(); await cards.nth(j).click(); await p.waitForTimeout(150);
+}
+await cards.nth([...Array(16).keys()].find((k) => !done.has(k))).click();
+await p.waitForTimeout(500);
+await p.screenshot({ path: `${OUT}/03b-memoria.png` }); await p.close();
+
+// Colheita Feliz: espera alguns frutos brotarem e colhe um
+p = await page(garden);
+await p.goto(BASE);
+await p.getByRole('button', { name: /Jogar/ }).first().click();
+await p.getByTestId('play-colheita').click();
+for (let k = 0; k < 6; k++) {
+  await p.waitForTimeout(700);
+  const f = p.locator('.hole.up').filter({ hasNotText: '🐛' }).first();
+  if (await f.count()) await f.dispatchEvent('pointerdown');
+}
+await p.waitForTimeout(900);
+await p.screenshot({ path: `${OUT}/03c-colheita.png` }); await p.close();
 
 await browser.close();
 console.log('ok');

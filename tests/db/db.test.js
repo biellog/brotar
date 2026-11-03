@@ -280,3 +280,22 @@ describe('perfil e conta', () => {
     }
   });
 });
+
+describe('app_releases (aviso de atualização)', () => {
+  it('qualquer pessoa lê; ninguém escreve pelo app', async () => {
+    await admin.query("insert into public.app_releases (version_code, version_name, notes, url) values (7, 'v1.1.0', 'Novos jogos', 'https://github.com/biellog/brotar/releases/tag/v1.1.0')");
+    const anon = await as(null, 'select version_code, version_name from public.app_releases');
+    expect(anon.rows).toEqual([{ version_code: 7, version_name: 'v1.1.0' }]);
+    const u = await newUser();
+    await expect(as(u, "insert into public.app_releases (version_code, version_name, url) values (999, 'falsa', 'https://evil.example')")).rejects.toThrow(/permission denied/);
+    await expect(as(null, "insert into public.app_releases (version_code, version_name, url) values (999, 'falsa', 'https://evil.example')")).rejects.toThrow(/permission denied/);
+    await expect(as(u, "update public.app_releases set url = 'https://evil.example'")).rejects.toThrow(/permission denied/);
+    await expect(as(u, 'delete from public.app_releases')).rejects.toThrow(/permission denied/);
+  });
+
+  it('só aceita URL https e versão única por plataforma', async () => {
+    await expect(admin.query("insert into public.app_releases (version_code, version_name, url) values (8, 'x', 'javascript:alert(1)')")).rejects.toThrow(/check/);
+    await expect(admin.query("insert into public.app_releases (version_code, version_name, url) values (8, 'x', 'http://inseguro.com')")).rejects.toThrow(/check/);
+    await expect(admin.query("insert into public.app_releases (version_code, version_name, url) values (7, 'dup', 'https://a.com')")).rejects.toThrow(/duplicate|unique/);
+  });
+});

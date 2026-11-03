@@ -51,8 +51,8 @@ export function step(g, dt, input = {}) {
   // movimento do jogador
   const p = g.player;
   if (typeof input.targetX === 'number') {
-    const d = input.targetX - p.x;
-    p.x += Math.sign(d) * Math.min(Math.abs(d), p.speed * 1.6 * dt);
+    // controle direto (mouse/dedo): o vaso vai exatamente para onde o ponteiro está — sem atraso
+    p.x = input.targetX;
   } else if (input.dir) {
     p.x += input.dir * p.speed * dt;
   }

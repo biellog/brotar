@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGame, step, multiplier, mulberry32 } from '../../src/game/engine.js';
+import { createGame, step, multiplier, mulberry32 } from '../../src/game/chuva-engine.js';
 
 const run = (g, secs, input = {}) => { for (let i = 0; i < secs * 60; i++) step(g, 1 / 60, input); return g; };
 

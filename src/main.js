@@ -1,9 +1,12 @@
 import './styles.css';
+import { Capacitor } from '@capacitor/core';
 import { h, clear } from './ui/dom.js';
 import { plantScene } from './ui/plant.js';
 import { LocalBackend } from './lib/backend-local.js';
 import { hasSupabase, SUPABASE_URL, SUPABASE_ANON_KEY, SITE_URL } from './lib/config.js';
 import { adsAvailable, showBanner, hideBanner, showRewarded } from './lib/ads.js';
+import { sfx, unlockAudio, soundEnabled, setSoundEnabled, startMusic, stopMusic } from './lib/sound.js';
+import { watchUpdates, setDismissed } from './lib/updates.js';
 import {
   MILESTONES, MILESTONE_BONUS, MILESTONE_LABELS, DAILY_LIMIT, AD_REWARD, SHOP_ITEMS, PLANT_STAGES,
   soberDays, soberParts, nextMilestone, plantStage, gamePoints, checkinPoints,
@@ -12,6 +15,24 @@ import {
 const app = document.getElementById('app');
 const S = { backend: null, data: null, view: 'jardim', sb: null, user: null, shopTab: 'planta', busy: false };
 const GUEST_FLAG = 'brotar:guest-chosen';
+const NATIVE = Capacitor.isNativePlatform();
+
+/** Abre um link fora do app. No Android, navegar para outro domínio faz o Capacitor abrir o navegador do sistema. */
+function openExternal(url) {
+  if (NATIVE) location.href = url; else window.open(url, '_blank', 'noopener');
+}
+if (NATIVE) {
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a[target="_blank"]');
+    if (!a) return;
+    let url = new URL(a.getAttribute('href'), location.href);
+    // páginas do próprio app (ex.: privacidade) abrem na versão publicada do site, se configurada
+    if (url.origin === location.origin && /^https:\/\/(?!localhost)/.test(SITE_URL)) url = new URL(url.pathname.split('/').pop(), SITE_URL);
+    if (url.origin === location.origin) return;
+    e.preventDefault();
+    openExternal(url.href);
+  });
+}
 
 const TIPS = [
   'A vontade é como uma onda: sobe, atinge o pico e passa. Respire e surfe nela.',
@@ -40,13 +61,13 @@ function toast(msg, kind = 'ok') {
 function modal(title, body, actions = [], closeLabel = actions.length ? 'Cancelar' : 'Fechar') {
   const close = () => { wrap.remove(); document.removeEventListener('keydown', esc); };
   const esc = (e) => { if (e.key === 'Escape') close(); };
-  const wrap = h('div', { class: 'modal-wrap', onclick: (e) => { if (e.target === wrap) close(); } },
+  const wrap = h('div', { class: 'modal-wrap', onclick: (e) => { if (e.target === wrap && closeLabel !== null) close(); } },
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
       h('h2', {}, title), body,
       h('div', { class: 'modal-actions' },
         ...actions.map((a) => h('button', { class: a.class ?? 'btn', onclick: async () => { if ((await a.onClick?.()) !== false) close(); } }, a.label)),
-        h('button', { class: 'btn ghost', onclick: close }, closeLabel))));
-  document.addEventListener('keydown', esc);
+        closeLabel === null ? null : h('button', { class: 'btn ghost', onclick: close }, closeLabel))));
+  if (closeLabel !== null) document.addEventListener('keydown', esc);
   document.body.append(wrap);
   wrap.querySelector('button')?.focus();
   return close;
@@ -72,10 +93,13 @@ async function act(fn, okMsg) {
 // ------------------------------------------------------------------ boot
 async function boot() {
   applyTheme('dia');
+  ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, unlockAudio, { passive: true }));
+  setupNative();
   if (hasSupabase) {
     const [{ makeSupabase, SupabaseBackend }] = await Promise.all([import('./lib/backend-supabase.js')]);
     S.sb = makeSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
     S.SupabaseBackend = SupabaseBackend;
+    watchUpdates(S.sb, showUpdate).catch(() => {});
     const { data } = await S.sb.auth.getSession();
     S.sb.auth.onAuthStateChange((ev, session) => {
       if (ev === 'SIGNED_OUT') { S.user = null; S.backend = null; renderAuth(); }
@@ -87,6 +111,40 @@ async function boot() {
     return renderAuth();
   }
   return startWith(new LocalBackend());
+}
+
+// ------------------------------------------------------------------ app Android
+async function setupNative() {
+  if (!NATIVE) return;
+  const { App } = await import('@capacitor/app');
+  const info = await App.getInfo().catch(() => null);
+  if (info) S.appVersion = `${info.version} (build ${info.build})`;
+  // botão "voltar" do Android: fecha jogo/janela antes de sair do app
+  App.addListener('backButton', () => {
+    const m = document.querySelector('.modal-wrap');
+    if (m) return m.querySelector('.modal-actions .btn.ghost')?.click();
+    if (currentGame) return currentGame.stop();
+    if (S.data?.profile.sober_since && S.view !== 'jardim') { S.view = 'jardim'; return render(); }
+    App.minimizeApp();
+  });
+}
+
+/** Aviso de nova versão (dados vindos da tabela app_releases do Supabase). */
+function showUpdate(rel) {
+  document.querySelector('.modal-wrap.update')?.remove();
+  sfx.bonus();
+  const close = modal(`🌱 Nova versão ${rel.version_name}`, h('div', { class: 'stack' },
+    h('p', {}, 'Uma atualização do Brotar está disponível.'),
+    rel.notes ? h('p', { class: 'notes' }, rel.notes) : null,
+    rel.mandatory ? h('p', { class: 'muted' }, 'Esta atualização é necessária para continuar usando o app.') : null),
+  [{ label: 'Atualizar agora', onClick: () => { openExternal(rel.url); return !rel.mandatory; } }],
+  rel.mandatory ? null : 'Depois');
+  document.querySelector('.modal-wrap:last-of-type')?.classList.add('update');
+  if (!rel.mandatory) {
+    const later = [...document.querySelectorAll('.modal-wrap.update .btn.ghost')].pop();
+    later?.addEventListener('click', () => setDismissed(rel.version_code));
+  }
+  return close;
 }
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -238,8 +296,10 @@ function viewGarden() {
         h('div', { class: 'bar' }, h('div', { style: { width: `${Math.round(nm.progress * 100)}%` } })),
         h('small', { class: 'muted' }, `Faltam ${plural(nm.next - d, 'dia', 'dias')}`),
       ] : h('b', {}, 'Você completou todos os marcos. Inspirador! 🌳'),
-      h('button', { class: 'btn big', disabled: doneToday, 'data-testid': 'checkin', onclick: () =>
-        act(() => S.backend.checkin(), (r) => r.bonus ? `+${r.points} 🌱 e marco desbloqueado: +${r.bonus} 🌱! 🎉` : `+${r.points} sementes. Orgulho de você! 💚`) },
+      h('button', { class: 'btn big', disabled: doneToday, 'data-testid': 'checkin', onclick: async () => {
+        const r = await act(() => S.backend.checkin(), (x) => x.bonus ? `+${x.points} 🌱 e marco desbloqueado: +${x.bonus} 🌱! 🎉` : `+${x.points} sementes. Orgulho de você! 💚`);
+        if (r) (r.bonus ? sfx.milestone : sfx.checkin)();
+      } },
       doneToday ? 'Check-in feito hoje ✔ Volte amanhã' : `Hoje estou sóbrio(a) · +${checkinPoints(d)} 🌱`),
       adsAvailable() && adsLeft > 0 ? h('button', { class: 'btn ghost', onclick: async () => {
         if (await showRewarded()) act(() => S.backend.claimAdReward(), `+${AD_REWARD} sementes pela rega extra 💧`);
@@ -249,49 +309,94 @@ function viewGarden() {
 }
 
 // ------------------------------------------------------------------ Jogar
-function viewPlay() {
-  const used = S.data.today.jogo ?? 0;
-  const left = DAILY_LIMIT.jogo - used;
-  return h('div', { class: 'stack' },
-    h('section', { class: 'card' },
-      h('h2', {}, '🌧️ Chuva Boa'),
-      h('p', {}, 'Mova o vasinho para pegar as gotas 💧, sóis ☀️ e sementes douradas 🌰. Desvie das nuvens de tempestade ⛈️ — elas são os gatilhos! Pegar várias seguidas multiplica seus pontos.'),
-      h('p', { class: 'muted' }, 'Arraste o dedo na tela (ou use ← →). Cada partida dura 45 segundos.'),
-      h('p', {}, left > 0 ? `Partidas premiadas hoje: ${left} de ${DAILY_LIMIT.jogo} (1 🌱 a cada 50 pontos, até 20).` : 'Você já usou as partidas premiadas de hoje, mas pode continuar jogando para se distrair 💚'),
-      h('button', { class: 'btn big', 'data-testid': 'play', onclick: startGame }, 'Jogar agora')));
+const GAMES = {
+  chuva: () => import('./game/chuva.js'),
+  memoria: () => import('./game/memoria.js'),
+  colheita: () => import('./game/colheita.js'),
+};
+const GAME_CARDS = [
+  { id: 'chuva', icon: '🌧️', name: 'Chuva Boa', desc: 'Pegue gotas, sóis e sementes com o vasinho. Desvie das tempestades.', time: '45 s' },
+  { id: 'memoria', icon: '🃏', name: 'Jardim da Memória', desc: 'Encontre os 8 pares de plantas e bichinhos. Calmo e bom para focar.', time: '90 s' },
+  { id: 'colheita', icon: '🧺', name: 'Colheita Feliz', desc: 'Toque nos frutos que brotam da terra, mas deixe as pragas em paz.', time: '40 s' },
+];
+let currentGame = null;
+
+function soundButton(extraClass = '') {
+  const b = h('button', { class: `btn ghost small ${extraClass}`, 'aria-label': 'Ligar ou desligar sons', 'data-testid': 'sound-toggle' });
+  const paint = () => { b.textContent = soundEnabled() ? '🔊' : '🔇'; b.setAttribute('aria-pressed', String(soundEnabled())); };
+  b.addEventListener('click', () => {
+    setSoundEnabled(!soundEnabled());
+    paint();
+    if (currentGame && soundEnabled()) startMusic();
+  });
+  paint();
+  return b;
 }
 
-async function startGame() {
+function viewPlay() {
+  const left = DAILY_LIMIT.jogo - (S.data.today.jogo ?? 0);
+  return h('div', { class: 'stack' },
+    h('section', { class: 'card' },
+      h('div', { class: 'row between' }, h('h2', {}, '🎮 Jogos'), soundButton()),
+      h('p', { class: 'muted' }, left > 0
+        ? `Partidas premiadas hoje: ${left} de ${DAILY_LIMIT.jogo}, somando todos os jogos (1 🌱 a cada 50 pontos, até 20 por partida).`
+        : 'Você já usou as partidas premiadas de hoje, mas pode continuar jogando para se distrair 💚')),
+    ...GAME_CARDS.map((g) => h('section', { class: 'card game-card' },
+      h('span', { class: 'game-icon', 'aria-hidden': 'true' }, g.icon),
+      h('div', { class: 'game-info' }, h('b', {}, g.name), h('small', { class: 'muted' }, g.desc), h('small', { class: 'tag' }, `⏱ ${g.time}`)),
+      h('button', { class: 'btn', 'data-testid': `play-${g.id}`, onclick: () => startGame(g.id) }, 'Jogar'))));
+}
+
+function closeGame(overlay, ctrl) {
+  ctrl?.stop();
+  stopMusic();
+  overlay.remove();
+  currentGame = null;
+  render();
+  showBanner();
+}
+
+async function startGame(id = 'chuva') {
   hideBanner();
-  const { mountGame } = await import('./game/view.js');
-  const hud = { score: h('b', {}, '0'), lives: h('span', {}, '❤️❤️❤️'), time: h('span', {}, '45s'), combo: h('span', { class: 'combo' }) };
-  const canvas = h('canvas', { class: 'game', 'aria-label': 'Área do jogo Chuva Boa' });
+  unlockAudio();
+  const mod = await GAMES[id]();
+  const { info } = mod;
+  const hud = { score: h('b', {}, '0'), lives: h('span', { class: 'lives' }), time: h('span', {}, `${info.duration}s`), label: h('span', { class: 'combo' }) };
+  let ctrl = null;
+  const stage = h('div', { class: `stage stage-${id}` });
   const overlay = h('div', { class: 'game-wrap', 'data-testid': 'game' },
-    h('div', { class: 'hud' }, h('span', {}, '⭐ ', hud.score), hud.combo, hud.time, hud.lives,
-      h('button', { class: 'btn ghost small', onclick: () => { ctrl.stop(); overlay.remove(); render(); showBanner(); } }, 'Sair')),
-    canvas);
+    h('div', { class: 'hud' }, h('span', {}, '⭐ ', hud.score), hud.label, hud.time, hud.lives,
+      soundButton('hud-btn'),
+      h('button', { class: 'btn ghost small hud-btn', onclick: () => closeGame(overlay, ctrl) }, 'Sair')),
+    stage);
   document.body.append(overlay);
-  const duration = new URLSearchParams(location.search).has('demo') ? 4 : 45;
-  const ctrl = mountGame(canvas, {
-    duration,
-    onUpdate: (g) => {
-      hud.score.textContent = fmt(g.score);
-      hud.lives.textContent = '❤️'.repeat(g.lives) + '🤍'.repeat(Math.max(3 - g.lives, 0));
-      hud.time.textContent = `${Math.max(Math.ceil(g.duration - g.t), 0)}s`;
-      hud.combo.textContent = g.combo >= 5 ? `x${Math.min(1 + Math.floor(g.combo / 5), 4)} combo!` : '';
+  currentGame = { overlay, stop: () => closeGame(overlay, ctrl) };
+  sfx.start();
+  startMusic();
+  ctrl = mod.mount(stage, {
+    demo: new URLSearchParams(location.search).has('demo'),
+    sound: sfx,
+    onUpdate: (u) => {
+      hud.score.textContent = fmt(u.score);
+      hud.time.textContent = `${Math.max(Math.ceil(u.timeLeft), 0)}s`;
+      hud.label.textContent = u.label ?? '';
+      hud.lives.textContent = u.maxLives ? '❤️'.repeat(u.lives) + '🤍'.repeat(Math.max(u.maxLives - u.lives, 0)) : '';
     },
-    onEnd: async (g) => {
-      const r = await act(() => S.backend.submitGame(g.score));
+    onEnd: async (res) => {
+      stopMusic();
+      sfx.over();
+      const r = await act(() => S.backend.submitGame(res.score));
       const pts = r?.points ?? 0;
+      if (pts > 0) setTimeout(() => sfx.coin(), 600);
       overlay.append(h('div', { class: 'game-over', 'data-testid': 'game-over' },
-        h('h2', {}, g.lives > 0 ? 'Tempo esgotado! 🌧️' : 'A tempestade passou ⛈️'),
-        h('p', { class: 'big-num' }, fmt(g.score)),
-        h('p', {}, `Melhor combo: ${g.bestCombo} · Itens pegos: ${g.caught}`),
-        h('p', {}, pts > 0 ? `Você ganhou +${pts} 🌱` : gamePoints(g.score) > 0 ? 'Sem partidas premiadas hoje — mas a distração valeu!' : 'Faça 50 pontos ou mais para ganhar sementes.'),
+        h('h2', {}, res.won ? `${info.icon} Muito bem!` : `${info.icon} Fim de jogo`),
+        h('p', { class: 'big-num' }, fmt(res.score)),
+        h('p', {}, res.stats),
+        h('p', {}, pts > 0 ? `Você ganhou +${pts} 🌱` : gamePoints(res.score) > 0 ? 'Sem partidas premiadas hoje, mas a distração valeu!' : 'Faça 50 pontos ou mais para ganhar sementes.'),
         h('p', { class: 'muted' }, 'Se a vontade apertou, lembre: ela passa. Você está indo bem.'),
         h('div', { class: 'row' },
-          h('button', { class: 'btn', onclick: () => { overlay.remove(); startGame(); } }, 'Jogar de novo'),
-          h('button', { class: 'btn ghost', onclick: () => { overlay.remove(); render(); showBanner(); } }, 'Voltar'))));
+          h('button', { class: 'btn', onclick: () => { overlay.remove(); currentGame = null; startGame(id); } }, 'Jogar de novo'),
+          h('button', { class: 'btn ghost', onclick: () => closeGame(overlay, null) }, 'Voltar'))));
     },
   });
 }
@@ -313,7 +418,7 @@ function viewShop() {
       } else if (has) {
         action = h('span', { class: 'tag' }, 'No jardim ✔');
       } else {
-        action = h('button', { class: 'btn small', disabled: !can, 'data-testid': `buy-${it.id}`, onclick: () => act(() => S.backend.buy(it.id), `${it.name} foi para o seu jardim! 🎉`) }, `🌱 ${fmt(it.price)}`);
+        action = h('button', { class: 'btn small', disabled: !can, 'data-testid': `buy-${it.id}`, onclick: async () => { if (await act(() => S.backend.buy(it.id), `${it.name} foi para o seu jardim! 🎉`)) sfx.coin(); } }, `🌱 ${fmt(it.price)}`);
       }
       return h('section', { class: `card item ${has ? 'owned' : ''}` }, h('span', { class: 'icon' }, it.icon), h('b', {}, it.name), action);
     })),
@@ -371,7 +476,9 @@ function viewProfile() {
       !isLocal ? h('button', { class: 'btn ghost', onclick: () => S.sb.auth.signOut() }, 'Sair') : null,
       h('button', { class: 'btn danger', onclick: confirmDelete }, isLocal ? 'Apagar todos os dados' : 'Excluir minha conta'),
       h('a', { class: 'small', href: 'privacidade.html', target: '_blank', rel: 'noopener' }, 'Política de privacidade')),
-    h('p', { class: 'small muted center-text' }, 'O Brotar é uma ferramenta de apoio e não substitui tratamento profissional.'));
+    h('section', { class: 'card row between' }, h('span', {}, 'Sons e música'), soundButton()),
+    h('p', { class: 'small muted center-text' }, 'O Brotar é uma ferramenta de apoio e não substitui tratamento profissional.'),
+    S.appVersion ? h('p', { class: 'small muted center-text' }, `Versão ${S.appVersion}`) : null);
 }
 
 async function exportData() {
@@ -408,10 +515,11 @@ function openSOS() {
     if (!circle.isConnected) return;
     const [label, ms, cls] = phases[i % 3];
     circle.className = `breath ${cls}`;
+    if (cls === 'in') sfx.breatheIn(); else if (cls === 'out') sfx.breatheOut();
     circle.firstChild.textContent = label;
     timer = setTimeout(() => run(i + 1), ms);
   };
-  circle.addEventListener('click', () => { clearTimeout(timer); run(); }, { once: true });
+  circle.addEventListener('click', () => { unlockAudio(); clearTimeout(timer); run(); }, { once: true });
   modal('Você não está sozinho(a) 💚', h('div', { class: 'sos-body' },
     h('p', {}, 'A vontade é forte agora, mas ela passa — geralmente em 15 a 30 minutos. Vamos respirar juntos:'),
     circle,
