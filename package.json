@@ -1,0 +1,37 @@
+{
+  "name": "brotar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Brotar — jardim da sobriedade: cada dia sóbrio faz seu jardim crescer.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test": "vitest run tests/unit",
+    "test:db": "vitest run tests/db",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test && npm run test:db && npm run build && npm run test:e2e && npm run test:e2e:supabase",
+    "audit": "npm audit --audit-level=high --omit=dev",
+    "android:sync": "npm run build && npx cap sync android",
+    "test:e2e:supabase": "playwright test -c playwright.supabase.config.js"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "8.3.0",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@supabase/supabase-js": "2.118.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@playwright/test": "1.63.0",
+    "pg": "8.23.1",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "jsdom": "27.0.0"
+  },
+  "overrides": {
+    "glob": "^14.0.3",
+    "minimatch": "^11.0.4"
+  }
+}
