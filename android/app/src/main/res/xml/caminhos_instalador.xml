@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Única pasta que o instalador do Android pode ler: o cache interno do app -->
+<paths>
+    <cache-path name="atualizacoes" path="atualizacoes/" />
+</paths>

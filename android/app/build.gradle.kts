@@ -67,4 +67,6 @@ flutter {
 dependencies {
     // exigido pelo flutter_local_notifications (notificações de atualização)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // FileProvider: entrega o APK baixado ao instalador do Android
+    implementation("androidx.core:core-ktx:1.13.1")
 }

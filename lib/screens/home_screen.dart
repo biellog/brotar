@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/atualizacao.dart';
+import '../data/instalador.dart';
 import '../data/notificacoes.dart';
 import '../data/repo.dart';
 import '../logic/progresso.dart';
@@ -35,7 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await Notificacoes.iniciar(aoTocar: _mostrarAtualizacao);
     await Notificacoes.agendarVerificacao();
     final nova = await Atualizacao.verificar();
-    if (nova == null || !mounted) return;
+    if (nova == null) {
+      await Instalador.limpar(); // já atualizado: apaga o APK baixado
+      return;
+    }
+    if (!mounted) return;
     setState(() => _novaVersao = nova);
     Repo.log('atualizacao_disponivel', {'versao': nova.nome});
     await Notificacoes.avisarAtualizacao(nova);

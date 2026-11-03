@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -6,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
+import 'instalador.dart';
 
 class VersaoApp {
   final int codigo;
@@ -69,44 +71,182 @@ class Atualizacao {
     return ultima.codigo > atual ? ultima : null;
   }
 
-  static Future<void> baixar(VersaoApp v) =>
+  /// Plano B: baixar pelo navegador (usado se o download interno falhar).
+  static Future<void> baixarNoNavegador(VersaoApp v) =>
       launchUrl(Uri.parse(v.url), mode: LaunchMode.externalApplication);
 
   static Future<void> mostrarDialogo(BuildContext context, VersaoApp v) {
     return showDialog(
       context: context,
-      barrierDismissible: !v.obrigatoria,
-      builder: (ctx) => PopScope(
-        canPop: !v.obrigatoria,
-        child: AlertDialog(
-          title: const Text('🚀 Nova versão disponível'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Fica Sóbrio ${v.nome}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              if (v.notas.trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(v.notas.trim(), maxLines: 8, overflow: TextOverflow.ellipsis),
+      barrierDismissible: false,
+      builder: (_) => _DialogoAtualizacao(v),
+    );
+  }
+}
+
+enum _Etapa { novidades, baixando, permissao, instalando, erro }
+
+class _DialogoAtualizacao extends StatefulWidget {
+  final VersaoApp v;
+  const _DialogoAtualizacao(this.v);
+
+  @override
+  State<_DialogoAtualizacao> createState() => _DialogoAtualizacaoState();
+}
+
+class _DialogoAtualizacaoState extends State<_DialogoAtualizacao> with WidgetsBindingObserver {
+  _Etapa _etapa = _Etapa.novidades;
+  double _progresso = 0;
+  String _erro = '';
+  File? _apk;
+
+  VersaoApp get v => widget.v;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Voltou da tela de permissão do Android: tenta instalar de novo sozinho.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _etapa == _Etapa.permissao && _apk != null) {
+      // só segue se a pessoa autorizou (senão a tela de permissão abriria sem parar)
+      Instalador.podeInstalar().then((ok) {
+        if (ok && mounted) _instalar();
+      });
+    }
+  }
+
+  Future<void> _atualizar() async {
+    if (!Instalador.suportado) {
+      await Atualizacao.baixarNoNavegador(v);
+      return;
+    }
+    try {
+      _apk = await Instalador.jaBaixado(v.codigo);
+      if (_apk == null) {
+        setState(() {
+          _etapa = _Etapa.baixando;
+          _progresso = 0;
+        });
+        _apk = await Instalador.baixar(v.url, v.codigo, (p) {
+          if (mounted) setState(() => _progresso = p);
+        });
+      }
+      await _instalar();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _etapa = _Etapa.erro;
+          _erro = '$e';
+        });
+      }
+    }
+  }
+
+  Future<void> _instalar() async {
+    try {
+      final r = await Instalador.instalar(_apk!);
+      if (!mounted) return;
+      setState(() => _etapa =
+          r == ResultadoInstalacao.precisaPermissao ? _Etapa.permissao : _Etapa.instalando);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _etapa = _Etapa.erro;
+          _erro = '$e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final podeFechar = !v.obrigatoria && _etapa != _Etapa.baixando;
+    return PopScope(
+      canPop: podeFechar,
+      child: AlertDialog(
+        title: Text(switch (_etapa) {
+          _Etapa.novidades => '🚀 Nova versão disponível',
+          _Etapa.baixando => '⬇️ Baixando atualização',
+          _Etapa.permissao => '🔓 Falta uma permissão',
+          _Etapa.instalando => '📲 Quase lá!',
+          _Etapa.erro => '⚠️ Não deu certo',
+        }),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: switch (_etapa) {
+            _Etapa.novidades => [
+                Text('Fica Sóbrio ${v.nome}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (v.notas.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(v.notas.trim(), maxLines: 8, overflow: TextOverflow.ellipsis),
+                ],
+                const SizedBox(height: 12),
+                const Text(
+                  'A atualização é baixada e instalada aqui mesmo, por cima do app. '
+                  'Seus dados ficam salvos na sua conta.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
               ],
-              const SizedBox(height: 12),
-              const Text(
-                'Toque em Atualizar, baixe o arquivo e abra para instalar por cima. '
-                'Seus dados ficam salvos na sua conta.',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            ],
-          ),
-          actions: [
-            if (!v.obrigatoria)
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Depois')),
-            FilledButton.icon(
-              onPressed: () => baixar(v),
-              icon: const Icon(Icons.system_update),
-              label: const Text('Atualizar'),
-            ),
-          ],
+            _Etapa.baixando => [
+                LinearProgressIndicator(value: _progresso > 0 ? _progresso : null, minHeight: 10),
+                const SizedBox(height: 10),
+                Text('${(_progresso * 100).round()}%  ·  não feche o app'),
+              ],
+            _Etapa.permissao => [
+                const Text(
+                  'O Android pediu sua autorização. Na tela que abriu, ative '
+                  '"Permitir desta fonte" para o Fica Sóbrio e volte aqui: '
+                  'a instalação continua sozinha.',
+                ),
+              ],
+            _Etapa.instalando => [
+                const Text(
+                  'Toque em "Atualizar" (ou "Instalar") na janela do Android. '
+                  'O app reabre já na versão nova. 💚',
+                ),
+              ],
+            _Etapa.erro => [
+                const Text('A atualização não foi baixada. Verifique a internet e tente de novo.'),
+                const SizedBox(height: 8),
+                Text(_erro, style: const TextStyle(color: Colors.white38, fontSize: 12), maxLines: 3),
+              ],
+          },
         ),
+        actions: [
+          if (podeFechar)
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Depois')),
+          ...switch (_etapa) {
+            _Etapa.novidades => [
+                FilledButton.icon(
+                  onPressed: _atualizar,
+                  icon: const Icon(Icons.system_update),
+                  label: const Text('Atualizar agora'),
+                ),
+              ],
+            _Etapa.baixando => <Widget>[],
+            _Etapa.permissao || _Etapa.instalando => [
+                FilledButton(onPressed: _instalar, child: const Text('Instalar')),
+              ],
+            _Etapa.erro => [
+                TextButton(
+                  onPressed: () => Atualizacao.baixarNoNavegador(v),
+                  child: const Text('Pelo navegador'),
+                ),
+                FilledButton(onPressed: _atualizar, child: const Text('Tentar de novo')),
+              ],
+          },
+        ],
       ),
     );
   }
