@@ -227,7 +227,7 @@ footer a{color:var(--suave)}
         <div class="missoes">
           <b>🎯 Missões de hoje</b>
           <p><s>✅ Check-in diário</s><em>+20 XP</em></p>
-          <p><span>⭕ Jogar Desvia da Garrafa</span><em>+XP</em></p>
+          <p><span>⭕ Jogar um dos jogos</span><em>+XP</em></p>
           <p><span>⭕ Beber um copo d'água 💧</span><em>+5 XP</em></p>
         </div>
         <div class="sos-mini">🆘 Estou com vontade agora</div>
@@ -254,7 +254,7 @@ footer a{color:var(--suave)}
       <div class="cartao"><div class="emo">⏱️</div><h3>Contador ao vivo</h3><p>Dias, horas e minutos sóbrio, atualizando na sua frente. Ver o número crescer dá vontade de continuar.</p></div>
       <div class="cartao"><div class="emo">⚡</div><h3>XP e níveis</h3><p>Check-ins, missões e fissuras vencidas valem XP. Você evolui de Semente até Lenda Sóbria.</p></div>
       <div class="cartao"><div class="emo">🆘</div><h3>Botão SOS</h3><p>Bateu a vontade? Respiração guiada, cronômetro e atalhos para o CVV 188, o CAPS e o AA.</p></div>
-      <div class="cartao"><div class="emo">🎮</div><h3>Mini-game anti-fissura</h3><p>Desvia da Garrafa ocupa a cabeça e as mãos enquanto a onda passa.</p></div>
+      <div class="cartao"><div class="emo">🎮</div><h3>3 jogos anti-fissura</h3><p>Desvia da Tempestade, Bolhas da Calma e Memória Zen, com música, para ocupar a cabeça e as mãos enquanto a onda passa.</p></div>
       <div class="cartao"><div class="emo">💰</div><h3>Dinheiro economizado</h3><p>Veja em reais quanto você deixou de gastar. Dá para planejar o que fazer com ele.</p></div>
       <div class="cartao"><div class="emo">💚</div><h3>Recaída sem culpa</h3><p>Se acontecer, só o contador recomeça. Seu XP, nível e conquistas continuam com você.</p></div>
       <div class="cartao"><div class="emo">📓</div><h3>Diário de humor</h3><p>Registre como está e o nível de vontade. Com o tempo, você descobre seus gatilhos.</p></div>
@@ -282,17 +282,17 @@ footer a{color:var(--suave)}
   <div class="wrap">
     <div>
       <span class="selo">🎮 Jogue agora, direto aqui</span>
-      <h2>Desvia da Garrafa</h2>
+      <h2>Desvia da Tempestade</h2>
       <p class="sub">Uma vontade forte dura, em média, de 15 a 20 minutos. Ocupar a mente e as mãos nesse tempo ajuda a onda passar. Experimente:</p>
       <ul class="lista-jogo">
         <li>👆 Arraste para os lados para mover o 😎</li>
-        <li>🍺🍷🥃🚬 Desvie, porque cada uma tira uma vida</li>
-        <li>💧 +10 &nbsp; ⭐ +30 &nbsp; ❤️ recupera vida</li>
+        <li>⛈️⚡🌪️ Desvie dos dias difíceis: cada um tira uma vida</li>
+        <li>💧 +10 &nbsp; ⭐ +30 &nbsp; 🍀 +50 &nbsp; ❤️ vida</li>
       </ul>
-      <p class="sub" style="font-size:16px">No app, cada 10 pontos viram 1 XP e o seu recorde fica salvo.</p>
+      <p class="sub" style="font-size:16px">No app tem mais dois jogos (Bolhas da Calma e Memória Zen). Cada 10 pontos viram 1 XP e o seu recorde fica salvo.</p>
     </div>
     <div class="palco" id="palco">
-      <canvas id="tela-jogo" aria-label="Jogo Desvia da Garrafa"></canvas>
+      <canvas id="tela-jogo" aria-label="Jogo Desvia da Tempestade"></canvas>
       <div class="hud"><span id="vidas">❤️❤️❤️</span><span class="pts" id="pontos">0</span></div>
       <div class="sobre" id="inicio">
         <div style="font-size:64px">😎</div>
@@ -418,14 +418,14 @@ document.getElementById('compartilhar').addEventListener('click', e => {
   else window.open('https://wa.me/?text='+encodeURIComponent(texto), '_blank');
 });
 
-// ---------- Jogo: Desvia da Garrafa ----------
+// ---------- Jogo: Desvia da Tempestade ----------
 (function(){
   const palco = document.getElementById('palco');
   const cv = document.getElementById('tela-jogo');
   const ctx = cv.getContext('2d');
   const elPts = document.getElementById('pontos'), elVidas = document.getElementById('vidas');
   const telaInicio = document.getElementById('inicio'), telaFim = document.getElementById('fim');
-  const RUINS = ['🍺','🍷','🥃','🍾','🚬'];
+  const RUINS = ['⛈️','⚡','🌪️','☄️'];
   let W=0,H=0,dpr=1, j, rodando=false, ultimo=0;
   let recorde = 0; try { recorde = +localStorage.getItem('fs_recorde') || 0; } catch(e){}
 
@@ -446,15 +446,15 @@ document.getElementById('compartilhar').addEventListener('click', e => {
     if (j.spawn<=0){
       j.spawn = Math.max(.25, .9/dif);
       const r = Math.random(); let tipo, e;
-      if (r<.62){tipo='ruim'; e=RUINS[Math.floor(Math.random()*RUINS.length)];}
-      else if (r<.88){tipo='agua'; e='💧';} else if (r<.97){tipo='estrela'; e='⭐';} else {tipo='vida'; e='❤️';}
+      if (r<.58){tipo='ruim'; e=RUINS[Math.floor(Math.random()*RUINS.length)];}
+      else if (r<.80){tipo='agua'; e='💧';} else if (r<.90){tipo='estrela'; e='⭐';} else if (r<.97){tipo='trevo'; e='🍀';} else {tipo='vida'; e='❤️';}
       j.itens.push({x:.06+Math.random()*.88, y:-.05, v:(.28+Math.random()*.2)*dif, tipo, e});
     }
     j.itens = j.itens.filter(it => {
       it.y += it.v*dt;
       if (Math.abs(it.y-.88)<.045 && Math.abs(it.x-j.x)<.085){
         if (it.tipo==='ruim'){ j.vidas--; palco.animate([{boxShadow:'inset 0 0 0 999px rgba(255,90,95,.3)'},{boxShadow:'none'}],{duration:180}); if (navigator.vibrate) navigator.vibrate(60); }
-        else if (it.tipo==='agua') j.pts+=10; else if (it.tipo==='estrela') j.pts+=30; else j.vidas=Math.min(3,j.vidas+1);
+        else if (it.tipo==='agua') j.pts+=10; else if (it.tipo==='estrela') j.pts+=30; else if (it.tipo==='trevo') j.pts+=50; else j.vidas=Math.min(3,j.vidas+1);
         return false;
       }
       return it.y < 1.1;

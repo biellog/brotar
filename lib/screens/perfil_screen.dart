@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/atualizacao.dart';
 import '../data/repo.dart';
 import '../logic/progresso.dart';
 import '../theme.dart';
@@ -78,6 +79,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
     final ok = await Repo.usarConvite(v);
     _msg(ok ? 'Convite aceito! +100 XP 🎉' : 'Código inválido ou já usado.');
     _carregar();
+  }
+
+  bool _verificando = false;
+
+  Future<void> _verificarAtualizacao() async {
+    setState(() => _verificando = true);
+    final nova = await Atualizacao.verificar();
+    if (!mounted) return;
+    setState(() => _verificando = false);
+    Repo.log('verificou_atualizacao', {'tem_nova': nova != null});
+    if (nova != null) {
+      await Atualizacao.mostrarDialogo(context, nova);
+    } else {
+      _msg('Você já está na versão mais recente. ✅');
+    }
   }
 
   Future<void> _excluir() async {
@@ -263,6 +279,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 subtitle: Text('${p['melhor_sequencia_dias']} dias · ${p['recaidas']} recomeços'),
               ),
             ]),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.system_update),
+              title: const Text('Verificar atualizações'),
+              subtitle: FutureBuilder<String>(
+                future: Atualizacao.nomeAtual(),
+                builder: (_, s) => Text('Versão instalada: ${s.data ?? '...'}'),
+              ),
+              trailing: _verificando
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.chevron_right),
+              onTap: _verificando ? null : _verificarAtualizacao,
+            ),
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(onPressed: Repo.sair, icon: const Icon(Icons.logout), label: const Text('Sair')),

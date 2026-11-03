@@ -4,7 +4,7 @@
 
 App Android (Flutter) que transforma a sobriedade num jogo: contador de dias, XP e níveis,
 missões diárias, conquistas, botão **SOS Fissura** com respiração guiada e o mini-game
-**Desvia da Garrafa** para atravessar a vontade. Login e todos os dados ficam no **Supabase**.
+**3 jogos com música** para atravessar a vontade, e aviso de atualização com notificação. Login e todos os dados ficam no **Supabase**.
 O APK é compilado **pelo GitHub** — você não precisa instalar nada no computador.
 
 ---
@@ -17,7 +17,9 @@ O APK é compilado **pelo GitHub** — você não precisa instalar nada no compu
 | ⚡ XP e níveis | Semente → Broto → Raiz Firme → … → **Lenda Sóbria** |
 | 🎯 Missões diárias | Check-in (+20 XP), jogar, beber água (+5 XP) |
 | 🏅 15 conquistas | 24h, 7 dias, 30, 90, 365 dias, recordes no jogo, fissuras vencidas… |
-| 🎮 Desvia da Garrafa | Arraste para fugir de 🍺🍷🥃🚬 e pegar 💧⭐❤️ (10 pontos = 1 XP) |
+| 🎮 3 jogos | **Desvia da Tempestade** (desvie de ⛈️⚡🌪️, pegue 💧⭐🍀), **Bolhas da Calma** (estoure bolhas em 45 s) e **Memória Zen** (8 pares). Sem bebida nem cigarro na tela, para não gerar gatilho. 10 pontos = 1 XP |
+| 🎵 Música | Toca nos jogos e no SOS. Coloque arquivos `.mp3`/`.ogg` em `assets/musica/`, sem mexer em código |
+| 🚀 Atualizações | O app consulta a tabela `versoes_app` no Supabase: mostra aviso, botão **Atualizar** e notificação (verificação a cada ~4 h, mesmo com o app fechado) |
 | 🆘 SOS Fissura | Registra intensidade e gatilho, respiração 4-4-6, cronômetro, CVV 188, CAPS (136), AA/NA, SAMU 192 |
 | 📓 Check-in diário | Humor, nível de vontade, diário |
 | 💚 Recaída sem culpa | Recomeça só o contador; XP, nível e conquistas continuam |
@@ -83,7 +85,17 @@ Aba **Actions → 📱 Gerar APK → Run workflow** (ou qualquer push na `main`)
 Em ~6 minutos o `FicaSobrio.apk` aparece em **Releases** (lado direito da página do repositório).
 Abra esse link no celular, baixe e instale.
 
-### 6. (Recomendado) Ajustes no Supabase pelo painel
+### 6. Como funcionam as atualizações
+A cada push na `main`, o workflow do APK publica a versão em **Releases** e registra na tabela
+`versoes_app` do Supabase (usando o `SUPABASE_ACCESS_TOKEN`). Os celulares com o app:
+- mostram um aviso e o botão **Atualizar** ao abrir o app (e em **Perfil → Verificar atualizações**);
+- recebem uma **notificação** (o app verifica sozinho a cada ~4 horas).
+
+Para obrigar todo mundo a atualizar (sem botão "Depois"), crie a variable `ATUALIZACAO_OBRIGATORIA` = `true`.
+**Importante:** cadastre a chave de assinatura (`ANDROID_KEYSTORE_BASE64` e cia.), senão o Android
+não instala a versão nova por cima da antiga.
+
+### 7. (Recomendado) Ajustes no Supabase pelo painel
 - **Authentication → URL Configuration**: coloque o link do seu site/landing page em *Site URL*
   (é para onde o link de confirmação de e-mail leva).
 - **Authentication → Providers → Email**: se quiser que a pessoa entre sem confirmar e-mail,
@@ -105,6 +117,10 @@ lib/
   config.dart               # nome, slogan, chaves via --dart-define
   data/repo.dart            # todas as chamadas ao Supabase + registro de eventos
   logic/progresso.dart      # níveis, conquistas, frases, dinheiro
+  games/                    # os 3 jogos (Tempestade, Bolhas, Memória)
+  data/musica.dart          # música de fundo (assets/musica/)
+  data/atualizacao.dart     # verifica versão nova no Supabase
+  data/notificacoes.dart    # notificação de atualização + verificação em segundo plano
   screens/                  # login, onboarding, início, jogo, SOS, perfil, check-in
 supabase/migrations/        # estrutura do banco (aplicada pelo GitHub Actions)
 .github/workflows/apk.yml   # compila e publica o APK

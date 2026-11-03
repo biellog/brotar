@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/musica.dart';
 import '../data/repo.dart';
+import '../games/comum.dart';
 import '../theme.dart';
 
 /// Botão de emergência para momentos de fissura ("urge surfing").
@@ -30,6 +32,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    if (_ativo) Musica.parar();
     _resp.dispose();
     _timer?.cancel();
     super.dispose();
@@ -41,6 +44,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
       _segundos = 0;
     });
     _resp.repeat();
+    Musica.tocar();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _segundos++));
     Repo.log('sos_iniciado', {'intensidade': _intensidade.round()});
   }
@@ -48,6 +52,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
   Future<void> _encerrar(bool superou) async {
     _timer?.cancel();
     _resp.stop();
+    Musica.parar();
     final dur = _segundos;
     setState(() => _ativo = false);
     final messenger = ScaffoldMessenger.of(context);
@@ -95,7 +100,10 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Text('SOS Fissura', style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+        Row(children: [
+          Expanded(child: Text('SOS Fissura', style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w900))),
+          const BotaoMusica(),
+        ]),
         const SizedBox(height: 4),
         const Text('A vontade é como uma onda: sobe, atinge o pico e passa — '
             'geralmente em 15 a 20 minutos. Vamos atravessar juntos.'),
@@ -160,7 +168,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
           OutlinedButton.icon(
             onPressed: widget.irParaJogo,
             icon: const Icon(Icons.sports_esports),
-            label: const Text('Distrair jogando Desvia da Garrafa'),
+            label: const Text('Distrair com um jogo'),
           ),
           const SizedBox(height: 8),
           FilledButton.icon(

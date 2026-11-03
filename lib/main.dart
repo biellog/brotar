@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
+import 'data/musica.dart';
 import 'data/repo.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
@@ -13,6 +14,7 @@ Future<void> main() async {
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
     await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
   }
+  await Musica.iniciar();
   runApp(const FicaSobrioApp());
 }
 

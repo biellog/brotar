@@ -17,7 +17,7 @@
   contador de dias sem beber, alcoolismo, vício, abstinência, largar a bebida, parar de fumar,
   dependência química, AA, recuperação, autocontrole, dinheiro economizado.
 - **Screenshots (ordem):** 1) contador "43 dias" + R$ economizado · 2) conquista desbloqueada ·
-  3) Desvia da Garrafa · 4) SOS Fissura com respiração · 5) "Recaída sem culpa".
+  3) jogos (Desvia da Tempestade) · 4) SOS Fissura com respiração · 5) "Recaída sem culpa".
 - **Categoria:** Saúde e fitness. **Classificação:** 18+ (tema álcool).
 
 ## 3. Motores de crescimento já embutidos no app
@@ -35,7 +35,7 @@ o funil (instalação → onboarding → D1/D7/D30 → indicação) direto no Su
 ## 4. Conteúdo (TikTok, Reels, Shorts) — 3 por semana
 1. **"Dia X sem beber"** — série diária com o contador do app na tela (o formato que mais viraliza no nicho).
 2. **"Quanto você gasta bebendo?"** — calcula em 15 s o R$ por ano. CTA: "o app mostra o seu".
-3. **"Desafio Desvia da Garrafa"** — tela do jogo + recorde, marcando amigos para bater.
+3. **"Desafio Desvia da Tempestade"** — tela do jogo + recorde, marcando amigos para bater.
 4. **"O que acontece com seu corpo em 24h / 7 dias / 30 dias sem álcool"** — informativo, com fonte.
 5. **"Recaí. E agora?"** — mensagem acolhedora; mostra que o XP não some.
 

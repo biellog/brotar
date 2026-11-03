@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/atualizacao.dart';
+import '../data/notificacoes.dart';
 import '../data/repo.dart';
 import '../logic/progresso.dart';
 import '../theme.dart';
 import '../widgets/compartilhar.dart';
 import 'checkin_sheet.dart';
-import 'game_screen.dart';
+import 'jogos_tab.dart';
 import 'perfil_screen.dart';
 import 'sos_screen.dart';
 
@@ -21,6 +23,29 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _aba = 0;
   int _versao = 0; // força recarregar a aba Início quando voltamos dela
+  VersaoApp? _novaVersao;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarAtualizacoes());
+  }
+
+  Future<void> _iniciarAtualizacoes() async {
+    await Notificacoes.iniciar(aoTocar: _mostrarAtualizacao);
+    await Notificacoes.agendarVerificacao();
+    final nova = await Atualizacao.verificar();
+    if (nova == null || !mounted) return;
+    setState(() => _novaVersao = nova);
+    Repo.log('atualizacao_disponivel', {'versao': nova.nome});
+    await Notificacoes.avisarAtualizacao(nova);
+    if (mounted) await Atualizacao.mostrarDialogo(context, nova);
+  }
+
+  Future<void> _mostrarAtualizacao() async {
+    final nova = _novaVersao ?? await Atualizacao.verificar();
+    if (nova != null && mounted) await Atualizacao.mostrarDialogo(context, nova);
+  }
 
   static const _nomesAbas = ['inicio', 'jogo', 'sos', 'perfil'];
 
@@ -35,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final telas = [
-      InicioTab(key: ValueKey('inicio$_versao'), irPara: _irPara),
+      InicioTab(key: ValueKey('inicio$_versao'), irPara: _irPara, novaVersao: _novaVersao),
       const JogoTab(),
       SosScreen(irParaJogo: () => _irPara(1)),
       PerfilScreen(key: ValueKey('perfil$_versao')),
@@ -59,7 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
 // ======================================================================
 class InicioTab extends StatefulWidget {
   final void Function(int) irPara;
-  const InicioTab({super.key, required this.irPara});
+  final VersaoApp? novaVersao;
+  const InicioTab({super.key, required this.irPara, this.novaVersao});
 
   @override
   State<InicioTab> createState() => _InicioTabState();
@@ -218,6 +244,20 @@ class _InicioTabState extends State<InicioTab> {
             ),
           ]),
           const SizedBox(height: 12),
+          if (widget.novaVersao != null) ...[
+            Card(
+              color: Cores.ouro,
+              child: ListTile(
+                leading: const Text('🚀', style: TextStyle(fontSize: 28)),
+                title: Text('Nova versão ${widget.novaVersao!.nome}',
+                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800)),
+                subtitle: const Text('Toque para atualizar o app', style: TextStyle(color: Colors.black87)),
+                trailing: const Icon(Icons.system_update, color: Colors.black),
+                onTap: () => Atualizacao.mostrarDialogo(context, widget.novaVersao!),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           // ------- Contador -------
           Container(
             padding: const EdgeInsets.all(24),
@@ -288,7 +328,7 @@ class _InicioTabState extends State<InicioTab> {
               child: Column(children: [
                 const ListTile(title: Text('🎯 Missões de hoje', style: TextStyle(fontWeight: FontWeight.bold))),
                 _Missao('Fazer o check-in diário', '+20 XP', _hoje.contains('checkin'), _abrirCheckin),
-                _Missao('Jogar Desvia da Garrafa', '+XP', _hoje.contains('partida'), () => widget.irPara(1)),
+                _Missao('Jogar um dos jogos', '+XP', _hoje.contains('partida'), () => widget.irPara(1)),
                 _Missao('Beber um copo d\'água 💧', '+5 XP', _hoje.contains('missao_agua'), _missaoAgua),
               ]),
             ),

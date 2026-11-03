@@ -1,0 +1,3 @@
+Coloque aqui as músicas do app (.mp3, .ogg, .m4a ou .wav).
+Elas entram no APK automaticamente e tocam em loop nos jogos e no SOS.
+Não precisa mudar código: basta adicionar o arquivo e dar push.

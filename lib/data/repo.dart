@@ -7,7 +7,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Toda a comunicação com o Supabase fica aqui.
 class Repo {
   static SupabaseClient get _db => Supabase.instance.client;
-  static String? get uid => _db.auth.currentUser?.id;
+  static String? get uid {
+    try {
+      return _db.auth.currentUser?.id;
+    } catch (_) {
+      return null; // Supabase ainda não iniciado (ex.: prévia)
+    }
+  }
 
   // ---------------- Dispositivo ----------------
   static Map<String, dynamic>? _dispositivo;
@@ -169,20 +175,36 @@ class Repo {
       .limit(n);
 
   // ---------------- Jogo ----------------
-  static Future<void> salvarPartida(int pontos, int duracaoSeg) async {
-    await _db.from('partidas').insert({'pontos': pontos, 'duracao_seg': duracaoSeg});
-    await log('partida', {'pontos': pontos, 'duracao_seg': duracaoSeg});
+  static Future<void> salvarPartida(String jogo, int pontos, int duracaoSeg) async {
+    if (uid == null) return;
+    await _db.from('partidas').insert({'jogo': jogo, 'pontos': pontos, 'duracao_seg': duracaoSeg});
+    await log('partida', {'jogo': jogo, 'pontos': pontos, 'duracao_seg': duracaoSeg});
   }
 
-  static Future<int> recorde() async {
-    final r = await _db
+  /// Maior pontuação (de um jogo específico ou de todos).
+  static Future<int> recorde([String? jogo]) async {
+    if (uid == null) return 0;
+    var q = _db.from('partidas').select('pontos').eq('user_id', uid!);
+    if (jogo != null) q = q.eq('jogo', jogo);
+    final r = await q.order('pontos', ascending: false).limit(1).maybeSingle();
+    return (r?['pontos'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Recorde de cada jogo: {'tempestade': 820, 'memoria': 950, ...}
+  static Future<Map<String, int>> recordesPorJogo() async {
+    if (uid == null) return {};
+    final rows = await _db
         .from('partidas')
-        .select('pontos')
+        .select('jogo, pontos')
         .eq('user_id', uid!)
         .order('pontos', ascending: false)
-        .limit(1)
-        .maybeSingle();
-    return (r?['pontos'] as num?)?.toInt() ?? 0;
+        .limit(300);
+    final m = <String, int>{};
+    for (final r in rows) {
+      final j = r['jogo'] as String? ?? 'tempestade';
+      m.putIfAbsent(j, () => (r['pontos'] as num).toInt());
+    }
+    return m;
   }
 
   static Future<int> totalPartidas() async {
