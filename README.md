@@ -91,6 +91,12 @@ Abra esse link no celular, baixe e instale.
 
 ---
 
+## 🌐 Site
+O site de divulgação fica em **https://biellog.github.io/fica-sobrio/**. Ele tem botão de download
+direto do APK, o jogo jogável no navegador, uma calculadora de gastos, FAQ e a política de
+privacidade (exigida pela Play Store). Ele é publicado sozinho pelo workflow **🌐 Publicar site**
+sempre que algo muda na pasta `site/`.
+
 ## 🧱 Estrutura
 
 ```
@@ -103,6 +109,8 @@ lib/
 supabase/migrations/        # estrutura do banco (aplicada pelo GitHub Actions)
 .github/workflows/apk.yml   # compila e publica o APK
 .github/workflows/supabase.yml  # cria/atualiza o banco
+site/                       # site de divulgação (GitHub Pages)
+.github/workflows/site.yml  # publica o site
 ```
 
 ## ⚠️ Aviso importante

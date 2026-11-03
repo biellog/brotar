@@ -74,7 +74,7 @@ jobs:
             --build-name=1.0.${{ github.run_number }} \
             --dart-define=SUPABASE_URL="$SB_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SB_KEY" \
-            --dart-define=LINK_DOWNLOAD=${{ vars.LINK_DOWNLOAD || format('https://github.com/{0}/releases/latest', github.repository) }}
+            --dart-define=LINK_DOWNLOAD=${{ vars.LINK_DOWNLOAD || 'https://biellog.github.io/fica-sobrio/' }}
           mv build/app/outputs/flutter-apk/app-release.apk FicaSobrio.apk
 
       - uses: actions/upload-artifact@v4

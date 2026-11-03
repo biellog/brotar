@@ -7,5 +7,5 @@ const appNome = 'Fica Sóbrio';
 const appSlogan = 'Cada dia sóbrio é um nível a mais.';
 const linkDownload = String.fromEnvironment(
   'LINK_DOWNLOAD',
-  defaultValue: 'https://github.com/biellog/fica-sobrio/releases/latest',
+  defaultValue: 'https://biellog.github.io/fica-sobrio/',
 );
