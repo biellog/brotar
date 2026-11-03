@@ -3,8 +3,8 @@
 // NUNCA coloque a service_role key aqui.
 const env = import.meta.env ?? {};
 
-export const SUPABASE_URL = env.VITE_SUPABASE_URL ?? '';
-export const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? '';
+export const SUPABASE_URL = String(env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+export const SUPABASE_ANON_KEY = String(env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 // URL pública do site (GitHub Pages) — destino dos links de confirmação/redefinição de senha.
 export const SITE_URL = env.VITE_SITE_URL || (globalThis.location ? location.origin + location.pathname : '');
 export const hasSupabase = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;

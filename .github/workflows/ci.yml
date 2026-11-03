@@ -147,10 +147,11 @@ jobs:
             echo "::warning::SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY não configurados: o app não será avisado desta versão."
             exit 0
           fi
+          # chaves novas (sb_secret_...) vão só no header apikey; a legada service_role (JWT) também no Authorization
+          HEADERS=(-H "apikey: $SERVICE_KEY" -H "Content-Type: application/json" -H "Prefer: return=minimal")
+          [[ "$SERVICE_KEY" == sb_* ]] || HEADERS+=(-H "Authorization: Bearer $SERVICE_KEY")
           jq -n --rawfile notes notes.txt --arg vn "$VERSION_NAME" --arg url "$RELEASE_URL" \
                 --argjson vc "$VERSION_CODE" --argjson m "$MANDATORY" \
                 '{platform:"android", version_code:$vc, version_name:$vn, notes:($notes|.[0:1000]), url:$url, mandatory:$m}' \
-          | curl -fsS -X POST "$SUPABASE_URL/rest/v1/app_releases" \
-              -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" \
-              -H "Content-Type: application/json" -H "Prefer: return=minimal" --data @-
+          | curl -fsS -X POST "${SUPABASE_URL%/}/rest/v1/app_releases" "${HEADERS[@]}" --data @-
           echo "Versão $VERSION_NAME (build $VERSION_CODE) registrada: o app vai avisar os usuários."
