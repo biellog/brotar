@@ -124,3 +124,17 @@ jobs:
           else
             echo "::warning::Não consegui registrar a versão no Supabase (a tabela versoes_app já foi criada?)."
           fi
+
+      # Confere se o celular vai enxergar a versão nova (mesma consulta e mesma chave que o app usa)
+      - name: Conferir aviso de atualização (como o celular vê)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          H=(-H "apikey: $SB_KEY")
+          [[ "$SB_KEY" == sb_* ]] || H+=(-H "Authorization: Bearer $SB_KEY")
+          R=$(curl -sS "$SB_URL/rest/v1/versoes_app?select=versao_codigo,versao_nome&order=versao_codigo.desc&limit=1" "${H[@]}")
+          echo "Resposta do Supabase para o app: $R"
+          if echo "$R" | grep -q "\"versao_codigo\":${{ github.run_number }}"; then
+            echo "OK: os celulares vão ver a versão 1.0.${{ github.run_number }} e mostrar o botão Atualizar."
+          else
+            echo "::warning::O app ainda não enxerga a versão 1.0.${{ github.run_number }}. Resposta: $R"
+          fi

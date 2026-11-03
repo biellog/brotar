@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -49,7 +51,8 @@ class Musica {
       );
       await _player.setReleaseMode(ReleaseMode.loop);
       await _player.setVolume(volumeMusica.value);
-      await _prepararEfeitos();
+      // carrega os efeitos sem atrasar a abertura do app
+      unawaited(_prepararEfeitos().catchError((Object e) => debugPrint('Efeitos indisponíveis: $e')));
     } catch (e) {
       debugPrint('Som indisponível: $e');
     }
