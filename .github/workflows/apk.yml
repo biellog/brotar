@@ -1,0 +1,97 @@
+name: 📱 Gerar APK
+
+# Roda a cada push na main (ou manualmente na aba Actions).
+# Gera o APK, guarda como artefato e publica em "Releases" para download.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['supabase/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir secrets obrigatórios
+        # Aceita como secret OU como variable. Remove /rest/v1/ ou barra final da URL.
+        env:
+          URL_BRUTA: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          CHAVE: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$URL_BRUTA" ] || [ -z "$CHAVE" ]; then
+            echo "::error::Cadastre SUPABASE_URL e SUPABASE_ANON_KEY (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          URL=$(echo "$URL_BRUTA" | sed -E 's#^(https://[^/]+).*#\1#')
+          echo "::add-mask::$CHAVE"
+          echo "SB_URL=$URL" >> "$GITHUB_ENV"
+          echo "SB_KEY=$CHAVE" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+      - name: Preparar chave de assinatura
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/fica-sobrio.jks
+            cat > android/key.properties <<PROPS
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS:-fica-sobrio}
+          storeFile=fica-sobrio.jks
+          PROPS
+            echo "Assinando com a chave oficial."
+          else
+            echo "::warning::Sem ANDROID_KEYSTORE_BASE64: APK assinado com chave de teste (atualizações vão exigir desinstalar)."
+          fi
+
+      - name: Compilar APK
+        run: |
+          flutter build apk --release \
+            --build-number=${{ github.run_number }} \
+            --build-name=1.0.${{ github.run_number }} \
+            --dart-define=SUPABASE_URL="$SB_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SB_KEY" \
+            --dart-define=LINK_DOWNLOAD=${{ vars.LINK_DOWNLOAD || format('https://github.com/{0}/releases/latest', github.repository) }}
+          mv build/app/outputs/flutter-apk/app-release.apk FicaSobrio.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FicaSobrio-apk
+          path: FicaSobrio.apk
+
+      - name: Publicar em Releases
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Fica Sóbrio 1.0.${{ github.run_number }}
+          make_latest: true
+          files: FicaSobrio.apk
+          body: |
+            📲 **Baixe o `FicaSobrio.apk` abaixo** e abra no celular Android.
+            (Se pedir, permita "instalar apps desconhecidos".)
+
+            Fica Sóbrio — cada dia sóbrio é um nível a mais.

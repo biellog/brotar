@@ -1,0 +1,2 @@
+# Configuração mínima para o Supabase CLI (usado pelo GitHub Actions).
+project_id = "fica-sobrio"

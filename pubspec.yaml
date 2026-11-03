@@ -1,0 +1,31 @@
+name: fica_sobrio
+description: "Fica Sóbrio — o jogo que te ajuda a ficar sóbrio, um dia de cada vez."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.12.0
+  device_info_plus: ^11.5.0
+  share_plus: ^10.1.4
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#0B3D2E"
+  adaptive_icon_foreground: "assets/icon/icon_fg.png"

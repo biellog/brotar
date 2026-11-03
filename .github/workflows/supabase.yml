@@ -1,0 +1,41 @@
+name: 🗄️ Criar/atualizar banco Supabase
+
+# Aplica as migrações de supabase/migrations no seu projeto Supabase.
+# Substitui o SQL Editor: basta rodar este workflow (ou dar push em supabase/).
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/**']
+  workflow_dispatch:
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      URL_BRUTA: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir secrets
+        run: |
+          # Sem SUPABASE_PROJECT_REF, descobre pelo SUPABASE_URL (https://REF.supabase.co)
+          if [ -z "$SUPABASE_PROJECT_REF" ] && [ -n "$URL_BRUTA" ]; then
+            SUPABASE_PROJECT_REF=$(echo "$URL_BRUTA" | sed -E 's#^https://([^.]+)\.supabase\.co.*#\1#')
+            echo "SUPABASE_PROJECT_REF=$SUPABASE_PROJECT_REF" >> "$GITHUB_ENV"
+          fi
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF; do
+            if [ -z "${!v}" ]; then echo "::error::Falta o secret $v"; exit 1; fi
+          done
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Conectar ao projeto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Aplicar migrações (criar tabelas, segurança e funções)
+        run: supabase db push --include-all --password "$SUPABASE_DB_PASSWORD"

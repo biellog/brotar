@@ -1,152 +1,111 @@
-# 🌱 Brotar — Jardim da Sobriedade
+# 🌱 Fica Sóbrio — o jogo de ficar sóbrio
 
-> Cada dia sóbrio faz seu jardim crescer.
+> **Cada dia sóbrio é um nível a mais.**
 
-![Brotar](docs/promo-brotar.png)
-
-O Brotar é um app (Android + site) que transforma a sobriedade num jogo leve e acolhedor:
-
-- **Contador ao vivo** de dias, horas e minutos sóbrios, com a sua frase de motivação.
-- **Jardim que cresce:** a planta principal muda de fase (semente → broto → … → árvore florida) com os dias.
-- **Sementes (pontos):** ganhe com o check-in diário (10–30), **marcos** (1, 3, 7, 14, 30, 60, 90, 180 e 365 dias, até +2000), o minijogo e anúncios premiados.
-- **Loja:** compre plantas, bichinhos e temas (Noite estrelada, Outono, Aurora) para o seu jardim.
-- **3 minijogos** para distrair a vontade (até 3 partidas premiadas por dia, somando todos):
-  - **Chuva Boa** 🌧️: pegue gotas, sóis e sementes com o vasinho e desvie das tempestades (os gatilhos).
-  - **Jardim da Memória** 🃏: encontre os 8 pares de cartas. É calmo e ajuda a focar.
-  - **Colheita Feliz** 🧺: toque nos frutos que brotam da terra, mas não nas pragas.
-- **Sons e música suave** sintetizados no próprio app (sem arquivos de áudio), com botão para desligar.
-- **Aviso de atualização** no app Android, alimentado pelo Supabase.
-- **Botão SOS:** respiração guiada, CVV 188, SAMU 192, AA, NA e CAPS AD.
-- **Recaída sem punição:** a contagem recomeça, mas sementes, itens e marcos ficam.
-- **Conta na nuvem (Supabase)** ou **modo sem conta** (dados só no aparelho).
-- **Privacidade:** exportar os dados e excluir a conta pelo próprio app (LGPD e exigência do Google Play).
-
-| Boas-vindas | Jardim | Jogos | Chuva Boa | Memória | Colheita | Loja | Marcos | SOS | Tema Noite |
-|---|---|---|---|---|---|---|---|---|---|
-| ![](docs/screenshots/01-boas-vindas.png) | ![](docs/screenshots/02-jardim.png) | ![](docs/screenshots/03a-jogos.png) | ![](docs/screenshots/03-jogo.png) | ![](docs/screenshots/03b-memoria.png) | ![](docs/screenshots/03c-colheita.png) | ![](docs/screenshots/04-loja.png) | ![](docs/screenshots/05-marcos.png) | ![](docs/screenshots/06-sos.png) | ![](docs/screenshots/07-tema-noite.png) |
-
-## Tecnologia
-
-- Web: JavaScript puro + Vite (sem framework, ~20 KB gzip no carregamento inicial)
-- Android: Capacitor 8 (`app.brotar.jardim`), AdMob via `@capacitor-community/admob`
-- Backend: Supabase (Postgres + Auth). **Todas as regras de pontos rodam no banco**, em funções `SECURITY DEFINER`. O app só pede, nunca escreve pontos.
-
-## Rodar localmente
-
-```bash
-npm install
-```
-
-```bash
-npm run dev
-```
-
-Sem `.env`, o app roda em **modo local** (sem login). Para usar contas, copie `.env.example` para `.env` e preencha.
-
-## 1. Configurar o Supabase
-
-1. Crie um projeto em <https://supabase.com>.
-2. Abra **SQL Editor**, cole todo o conteúdo de `supabase/migrations/20261103000000_init.sql` e clique em **Run**.
-3. Em **Authentication → Sign In / Providers → Email**: deixe **Confirm email** ligado e a senha com no mínimo 8 caracteres. Ligue **Leaked password protection** se o seu plano tiver.
-4. Em **Authentication → URL Configuration**:
-   - **Site URL:** `https://SEU-USUARIO.github.io/brotar/`
-   - **Redirect URLs:** a mesma URL.
-5. Em **Project Settings → API**, copie a **Project URL** e a chave **anon / publishable**.
-   ⚠️ Nunca use a chave `service_role` no app.
-
-## 2. Publicar no GitHub (site + APK automáticos)
-
-1. Crie um repositório **vazio** chamado `brotar` e envie este código para ele.
-2. Em **Settings → Pages → Source**, escolha **GitHub Actions**.
-3. Em **Settings → Secrets and variables → Actions → Variables**, crie:
-
-| Variável | Valor |
-|---|---|
-| `SUPABASE_URL` | `https://xxxx.supabase.co` |
-| `SUPABASE_ANON_KEY` | chave anon/publishable |
-| `SITE_URL` | `https://SEU-USUARIO.github.io/brotar/` |
-| `ADMOB_APP_ID` | `ca-app-pub-XXXX~YYYY` (deixe vazio para usar o ID de teste) |
-| `ADMOB_BANNER_ID` | ID do bloco de banner |
-| `ADMOB_REWARDED_ID` | ID do bloco premiado |
-| `ADMOB_TESTING` | `true` até o app ser aprovado, depois `false` |
-
-4. Cada push na `main` roda os testes, publica o site e gera o **APK de debug** (aba **Actions → artifact `brotar-android`**).
-5. **Para a Play Store** (APK/AAB assinados), gere uma chave **uma única vez** e guarde-a com muito cuidado. Se perder a chave, não consegue atualizar o app:
-
-```bash
-keytool -genkeypair -v -keystore brotar-release.jks -alias brotar -keyalg RSA -keysize 4096 -validity 10000
-```
-
-```bash
-base64 -w0 brotar-release.jks
-```
-
-   Crie os **Secrets** `ANDROID_KEYSTORE_BASE64` (a saída do comando acima), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`brotar`) e `ANDROID_KEY_PASSWORD`. Com eles, o CI também gera `app-release.apk` e `app-release.aab`. Para publicar um release com os arquivos anexados, crie uma tag `v1.0.0`.
-
-## 3. Aviso de atualização (Supabase)
-
-Como funciona:
-1. Você publica uma versão nova criando uma **tag** (com a mensagem virando a "novidade" mostrada no app):
-
-```bash
-git tag -a v1.1.0 -m "Novos jogos e sons!"
-```
-
-```bash
-git push origin v1.1.0
-```
-
-2. O GitHub Actions compila o APK, cria o **Release** com o APK anexado e registra a versão na tabela `app_releases` do Supabase.
-3. O app Android compara a versão instalada com a do banco **ao abrir**, **ao voltar do segundo plano** e **ao vivo** (Supabase Realtime). Se houver versão nova, mostra "🌱 Nova versão disponível" com o botão **Atualizar agora**.
-
-Configuração (uma vez só):
-- Rode também a migração `supabase/migrations/20261104000000_app_releases.sql` no SQL Editor.
-- Crie o **Secret** `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API → service_role). Ela fica **só no GitHub**, nunca no app.
-- Opcional: a variável `UPDATE_URL` define para onde o botão leva. O padrão é a página do Release no GitHub; depois que o app estiver na Play Store, use `https://play.google.com/store/apps/details?id=app.brotar.jardim`.
-- Opcional: `UPDATE_MANDATORY=true` torna a atualização obrigatória (o aviso não pode ser fechado).
-
-⚠️ **Assinatura:** para uma versão nova instalar **por cima** da antiga sem perder os dados, todas precisam ser assinadas com a **mesma chave**. Configure o keystore de release (passo 2.5) **antes** de distribuir o app. APKs de debug do CI são assinados com chaves diferentes a cada build, então a pessoa precisaria desinstalar o app para atualizar.
-
-> Isso é um aviso **dentro do app**. Para uma notificação push com o app **fechado**, é preciso adicionar o Firebase Cloud Messaging (dá para integrar com o Supabase por uma Edge Function).
-
-## 4. AdMob
-
-O app já vem com:
-- **Banner** na parte de baixo, escondido durante o jogo.
-- **Anúncio premiado** ("Rega extra: +15 sementes"): até 3 por dia, com o limite garantido no servidor.
-- **Formulário de consentimento (UMP)** para quem estiver na UE/Reino Unido.
-- **IDs de teste do Google por padrão.** Nunca clique nos seus próprios anúncios reais.
-
-Checklist no console do AdMob:
-1. Crie o app (Android) e dois blocos: **Banner** e **Premiado**. Coloque os IDs nas variáveis acima.
-2. **Muito importante para um app de sobriedade:** em **Bloqueio de controles → Categorias sensíveis**, bloqueie **Álcool**, **Jogos de azar** e **Drogas/remédios**. Também bloqueie as categorias gerais de bebidas.
-3. Defina a classificação máxima de conteúdo dos anúncios como **T** (Teen) ou mais restrita.
-4. Publique o `app-ads.txt` no site do desenvolvedor informado na Play Store.
-
-## 5. Google Play: pontos de atenção
-
-- **Política de privacidade:** `https://SEU-USUARIO.github.io/brotar/privacidade.html`. Preencha os campos entre colchetes antes de publicar.
-- **Exclusão de conta:** existe dentro do app (Perfil → Excluir minha conta). Informe isso no formulário "Segurança dos dados".
-- **Segurança dos dados:** declare e-mail, informações de saúde (sobriedade), ID de publicidade (AdMob) e dados de interação com o app.
-- **Público:** 18+. Apps sobre álcool/drogas não devem ser direcionados a crianças.
-- **Apps de saúde:** preencha a declaração de apps de saúde e deixe claro que o app **não substitui tratamento**.
-
-## Testes
-
-```bash
-npm run test:all
-```
-
-| Suíte | O que cobre |
-|---|---|
-| `npm test` (46) | regras de pontos, motores dos 3 jogos (determinismo, anti speed-hack, controle sem atraso), aviso de atualização, backend local, helper anti-XSS |
-| `npm run test:db` (29) | migração real no Postgres: **RLS**, privilégios, injeção de SQL, **gasto duplo em corrida**, limites diários, exclusão LGPD |
-| `npm run test:e2e` (17) | fluxo completo no navegador (Pixel 7), os 3 jogos, mouse sem atraso, som, **XSS**, **CSP**, dados locais adulterados, segredos no bundle |
-| `npm run test:e2e:supabase` (3) | app em modo conta falando com a migração real (cadastro, login, compra, cliente adulterado, exclusão) |
-
-Os testes de banco precisam de um Postgres em `DATABASE_URL` (padrão `postgresql://brotar_test:brotar_test@localhost:5432/brotar_test`).
-
-Veja também [SECURITY.md](SECURITY.md).
+App Android (Flutter) que transforma a sobriedade num jogo: contador de dias, XP e níveis,
+missões diárias, conquistas, botão **SOS Fissura** com respiração guiada e o mini-game
+**Desvia da Garrafa** para atravessar a vontade. Login e todos os dados ficam no **Supabase**.
+O APK é compilado **pelo GitHub** — você não precisa instalar nada no computador.
 
 ---
-O Brotar é uma ferramenta de apoio e **não substitui tratamento profissional**. Em crise: **CVV 188** · **SAMU 192**.
+
+## ✨ O que tem no app
+
+| Recurso | O que faz |
+|---|---|
+| ⏱️ Contador | Dias, horas e minutos sóbrio + dinheiro economizado |
+| ⚡ XP e níveis | Semente → Broto → Raiz Firme → … → **Lenda Sóbria** |
+| 🎯 Missões diárias | Check-in (+20 XP), jogar, beber água (+5 XP) |
+| 🏅 15 conquistas | 24h, 7 dias, 30, 90, 365 dias, recordes no jogo, fissuras vencidas… |
+| 🎮 Desvia da Garrafa | Arraste para fugir de 🍺🍷🥃🚬 e pegar 💧⭐❤️ (10 pontos = 1 XP) |
+| 🆘 SOS Fissura | Registra intensidade e gatilho, respiração 4-4-6, cronômetro, CVV 188, CAPS (136), AA/NA, SAMU 192 |
+| 📓 Check-in diário | Humor, nível de vontade, diário |
+| 💚 Recaída sem culpa | Recomeça só o contador; XP, nível e conquistas continuam |
+| 🤝 Indique e ganhe | Código de convite: quem indica ganha 200 XP, quem entra 100 XP |
+| 📤 Compartilhar | Conquistas, recordes e dias sóbrio viram posts com o link do app |
+| 🔒 LGPD | Termo de consentimento + botão "Excluir minha conta" |
+
+### O que é salvo no Supabase
+Tudo que a pessoa faz **dentro do app** fica gravado na conta dela:
+
+- `perfis` — nome, data de início, motivo, gasto diário, XP, recaídas, código de convite
+- `checkins` — humor, vontade, se ficou sóbrio, diário
+- `fissuras` — cada SOS: intensidade, gatilho, se venceu, duração
+- `partidas` — pontos e duração de cada partida
+- `conquistas` — medalhas desbloqueadas
+- `eventos` — **histórico de cada ação** (login, telas abertas, check-ins, partidas, compartilhamentos,
+  ligações de ajuda…) junto com os **dados do aparelho** (marca, modelo, versão do Android, fuso)
+
+Cada pessoa só enxerga os próprios dados (Row Level Security).
+
+---
+
+## 🚀 Passo a passo (sem SQL Editor, sem instalar nada)
+
+### 1. Crie o projeto no Supabase
+1. Entre em <https://supabase.com> → **New project**. Anote a **senha do banco** que você escolher.
+2. Em **Project Settings → API**, copie:
+   - **Project URL** → vai virar o secret `SUPABASE_URL`
+   - **anon / publishable key** → vai virar o secret `SUPABASE_ANON_KEY`
+3. O **Project ref** é o código no meio da URL (`https://`**`abcdxyz`**`.supabase.co`) → `SUPABASE_PROJECT_REF`
+4. Em <https://supabase.com/dashboard/account/tokens> clique **Generate new token** → `SUPABASE_ACCESS_TOKEN`
+
+### 2. Repositório
+O código já está em <https://github.com/biellog/fica-sobrio> (branch `main`).
+
+### 3. Cadastre os secrets
+No repositório: **Settings → Secrets and variables → Actions**
+
+| Nome | Onde cadastrar | Valor |
+|---|---|---|
+| `SUPABASE_URL` | Secret **ou** Variable | Project URL (pode ter `/rest/v1/` no fim, o workflow limpa) |
+| `SUPABASE_ANON_KEY` | Secret **ou** Variable | anon / publishable key |
+| `SUPABASE_ACCESS_TOKEN` | Secret | token pessoal do Supabase |
+| `SUPABASE_DB_PASSWORD` | Secret | senha do banco |
+| `SUPABASE_PROJECT_REF` | Secret (opcional) | se faltar, é tirado da `SUPABASE_URL` |
+| `ANDROID_KEYSTORE_BASE64` | Secret | chave de assinatura em base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | Secret | senha da chave |
+| `ANDROID_KEY_ALIAS` | Secret | apelido da chave |
+| `ANDROID_KEY_PASSWORD` | Secret (opcional) | se faltar, usa a senha da chave |
+
+> A chave de assinatura garante que cada versão nova **atualize** o app no celular em vez de pedir
+> para desinstalar. Guarde uma cópia em lugar seguro: sem ela não dá para publicar atualizações na Play Store.
+
+### 4. Crie o banco (substitui o SQL Editor)
+Aba **Actions → 🗄️ Criar/atualizar banco Supabase → Run workflow**.
+Em ~1 minuto todas as tabelas, regras de segurança e funções estarão criadas.
+(As migrações antigas do Brotar continuam na pasta só para o histórico do banco bater; as tabelas
+do Fica Sóbrio têm nomes diferentes e não conflitam.)
+Sempre que algo mudar em `supabase/migrations`, ele roda sozinho.
+
+### 5. Gere o APK
+Aba **Actions → 📱 Gerar APK → Run workflow** (ou qualquer push na `main`).
+Em ~6 minutos o `FicaSobrio.apk` aparece em **Releases** (lado direito da página do repositório).
+Abra esse link no celular, baixe e instale.
+
+### 6. (Recomendado) Ajustes no Supabase pelo painel
+- **Authentication → URL Configuration**: coloque o link do seu site/landing page em *Site URL*
+  (é para onde o link de confirmação de e-mail leva).
+- **Authentication → Providers → Email**: se quiser que a pessoa entre sem confirmar e-mail,
+  desative *Confirm email* (mais conversão; menos verificação).
+
+---
+
+## 🧱 Estrutura
+
+```
+lib/
+  main.dart                 # inicia Supabase e decide login/onboarding/início
+  config.dart               # nome, slogan, chaves via --dart-define
+  data/repo.dart            # todas as chamadas ao Supabase + registro de eventos
+  logic/progresso.dart      # níveis, conquistas, frases, dinheiro
+  screens/                  # login, onboarding, início, jogo, SOS, perfil, check-in
+supabase/migrations/        # estrutura do banco (aplicada pelo GitHub Actions)
+.github/workflows/apk.yml   # compila e publica o APK
+.github/workflows/supabase.yml  # cria/atualiza o banco
+```
+
+## ⚠️ Aviso importante
+O Fica Sóbrio é uma ferramenta de apoio e **não substitui tratamento**. Parar de beber de forma
+abrupta após uso intenso pode causar abstinência grave — procure um médico ou o CAPS AD
+(Disque Saúde 136). Em sofrimento emocional, ligue **188 (CVV)**. Emergência: **192**.
