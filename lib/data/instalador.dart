@@ -82,6 +82,12 @@ class Instalador {
       if (total > 0 && recebido != total) {
         throw const HttpException('Download incompleto. Verifique a internet e tente de novo.');
       }
+      // confere se é mesmo um APK (arquivo ZIP começa com "PK") antes de aceitar
+      final cabecalho = await parcial.openRead(0, 2).first;
+      if (cabecalho.length < 2 || cabecalho[0] != 0x50 || cabecalho[1] != 0x4B) {
+        await parcial.delete();
+        throw const HttpException('O arquivo baixado não é um APK válido.');
+      }
       await parcial.rename(apk.path);
       await marca.writeAsString('$versaoCodigo');
       aoProgredir(1);

@@ -7,6 +7,7 @@ import '../games/jardim_magico.dart';
 import '../games/memoria.dart';
 import '../games/relaxantes.dart';
 import '../games/tempestade.dart';
+import '../games/tycoon/tycoon_screen.dart';
 import '../logic/movimento.dart';
 import '../theme.dart';
 
@@ -18,6 +19,9 @@ class InfoJogo {
 }
 
 final jogos = <InfoJogo>[
+  InfoJogo('tycoon', '🧃', 'Império do Suco',
+      'Comece com uma barraca de limonada e monte um império de sucos. Contrate gerentes, abra filiais!',
+      'Simulador', const Color(0xFFFF9F1C), () => const TycoonScreen()),
   InfoJogo('tempestade', '⛈️', 'Desvia da Tempestade',
       'Arraste para pegar estrelas, gotas e trevos e fugir das tempestades.',
       'Agilidade', const Color(0xFF1FAF7A), () => const TempestadeScreen()),
@@ -106,7 +110,8 @@ class _JogoTabState extends State<JogoTab> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final desafios = jogos.where((j) => j.tipo != 'Relaxante');
+    final simuladores = jogos.where((j) => j.tipo == 'Simulador');
+    final desafios = jogos.where((j) => j.tipo != 'Relaxante' && j.tipo != 'Simulador');
     final relaxantes = jogos.where((j) => j.tipo == 'Relaxante');
     return RefreshIndicator(
       onRefresh: _atualizar,
@@ -126,6 +131,13 @@ class _JogoTabState extends State<JogoTab> {
             style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 16),
+          Text('🏪 Simulador', style: t.titleMedium),
+          const SizedBox(height: 8),
+          for (final j in simuladores) ...[
+            _CartaoJogo(j, _recordes[j.id] ?? 0, true, 0, () => _abrir(j)),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 8),
           Text('🎯 Desafios', style: t.titleMedium),
           const SizedBox(height: 8),
           for (final j in desafios) ...[

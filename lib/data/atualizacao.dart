@@ -17,6 +17,10 @@ class VersaoApp {
   final bool obrigatoria;
   const VersaoApp(this.codigo, this.nome, this.url, this.notas, this.obrigatoria);
 
+  /// Só aceita atualizações publicadas no repositório oficial do app.
+  static const origemOficial = 'https://github.com/biellog/fica-sobrio/releases/download/';
+  bool get urlOficial => url.startsWith(origemOficial) && !url.contains('..');
+
   factory VersaoApp.deJson(Map<String, dynamic> j) => VersaoApp(
         (j['versao_codigo'] as num).toInt(),
         j['versao_nome'] as String,
@@ -45,7 +49,8 @@ class Atualizacao {
       if (r.statusCode != 200) return null;
       final lista = jsonDecode(r.body) as List;
       if (lista.isEmpty) return null;
-      return VersaoApp.deJson(lista.first as Map<String, dynamic>);
+      final v = VersaoApp.deJson(lista.first as Map<String, dynamic>);
+      return v.urlOficial ? v : null; // ignora endereço fora do repositório oficial
     } catch (_) {
       return null;
     }

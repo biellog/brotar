@@ -8,6 +8,7 @@ import 'package:fica_sobrio/games/relaxantes.dart';
 import 'package:fica_sobrio/logic/movimento.dart';
 import 'package:fica_sobrio/screens/movimento.dart';
 import 'package:fica_sobrio/games/tempestade.dart';
+import 'package:fica_sobrio/games/tycoon/tycoon_screen.dart';
 import 'package:fica_sobrio/screens/jogos_tab.dart';
 import 'package:fica_sobrio/theme.dart';
 import 'package:fica_sobrio/widgets/painel_gastos.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
     'plastico' => const PlasticoBolhaScreen(),
     'jardim' => const JardimMagicoScreen(),
     'mandala' => const MandalaScreen(),
+    'tycoon' => const TycoonScreen(),
     'painel' => Scaffold(body: SafeArea(child: ListView(padding: const EdgeInsets.all(16), children: [PainelGastos(gastoDiario: 25, aoSalvar: (_) async {})]))),
     'aquario' => const AquarioScreen(),
     'movimento' => Scaffold(body: SafeArea(child: MovimentoTab(irParaJogos: () {}))),

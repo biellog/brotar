@@ -12,7 +12,15 @@ enum Efeito {
   bolhaCerta('sons/bolha_certa.ogg'), // Bolhas da Calma: bolha boa
   bolhaErrada('sons/bolha_errada.ogg'), // Bolhas da Calma: nuvem
   plastico('sons/plastico.ogg'), // Plástico Bolha: estourou
-  plantar('sons/plantar.ogg'); // Jardim Mágico: plantou
+  plantar('sons/plantar.ogg'), // Jardim Mágico: plantou
+  // Império do Suco (sons sintetizados em tool/compor_sons.py)
+  tyMoeda('sons/ty_moeda.ogg'),
+  tyCaixa('sons/ty_caixa.ogg'),
+  tyCompra('sons/ty_compra.ogg'),
+  tyMarco('sons/ty_marco.ogg'),
+  tyGerente('sons/ty_gerente.ogg'),
+  tyFilial('sons/ty_filial.ogg'),
+  tyToque('sons/ty_toque.ogg');
 
   final String arquivo;
   const Efeito(this.arquivo);
@@ -63,7 +71,10 @@ class Musica {
   static Future<void> _prepararEfeitos() async {
     for (final e in Efeito.values) {
       final lista = <AudioPlayer>[];
-      for (var i = 0; i < 3; i++) {
+      // sons rápidos e repetidos ganham 3 "vozes"; os raros, 2
+      const frequentes = {Efeito.tyMoeda, Efeito.plastico, Efeito.bolhaCerta, Efeito.carta, Efeito.tyToque};
+      final vozes = frequentes.contains(e) ? 3 : 2;
+      for (var i = 0; i < vozes; i++) {
         final p = AudioPlayer(playerId: '${e.name}_$i');
         await p.setPlayerMode(PlayerMode.lowLatency);
         await p.setReleaseMode(ReleaseMode.stop);

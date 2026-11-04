@@ -44,6 +44,8 @@ class _PainelGastosState extends State<PainelGastos> {
 
   @override
   void dispose() {
+    // saiu da tela antes do salvamento automático: salva agora para não perder o valor
+    if (_salvar?.isActive ?? false) widget.aoSalvar(_mensal / diasPorMes);
     _salvar?.cancel();
     _campo.dispose();
     super.dispose();

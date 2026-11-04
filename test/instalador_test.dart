@@ -31,7 +31,7 @@ Future<HttpServer> _servidor(List<int> conteudo, {bool cortar = false}) async {
 }
 
 void main() {
-  final apkFalso = List<int>.generate(300000, (i) => i % 251);
+  final apkFalso = [0x50, 0x4B, ...List<int>.generate(300000, (i) => i % 251)];
 
   test('baixa seguindo o redirecionamento, mostra progresso e sobrescreve o mesmo arquivo', () async {
     final s = await _servidor(apkFalso);
@@ -59,6 +59,16 @@ void main() {
     final dir = await Directory.systemTemp.createTemp('fica_');
     final url = 'http://127.0.0.1:${s.port}/objeto/apk';
     await expectLater(Instalador.baixarPara(dir, url, 9, (_) {}), throwsA(anything));
+    expect(File('${dir.path}/atualizacao.apk').existsSync(), isFalse);
+    await s.close(force: true);
+    await dir.delete(recursive: true);
+  });
+
+  test('recusa arquivo que não é APK', () async {
+    final s = await _servidor(List<int>.filled(1000, 60)); // "<<<<": página HTML, por exemplo
+    final dir = await Directory.systemTemp.createTemp('fica_');
+    await expectLater(
+        Instalador.baixarPara(dir, 'http://127.0.0.1:${s.port}/objeto/apk', 9, (_) {}), throwsA(anything));
     expect(File('${dir.path}/atualizacao.apk').existsSync(), isFalse);
     await s.close(force: true);
     await dir.delete(recursive: true);
