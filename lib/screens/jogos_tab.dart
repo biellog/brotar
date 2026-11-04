@@ -4,7 +4,9 @@ import '../data/repo.dart';
 import '../games/bolhas.dart';
 import '../games/comum.dart';
 import '../games/memoria.dart';
+import '../games/relaxantes.dart';
 import '../games/tempestade.dart';
+import '../logic/movimento.dart';
 import '../theme.dart';
 
 class InfoJogo {
@@ -24,10 +26,25 @@ final jogos = <InfoJogo>[
   InfoJogo('memoria', '🧠', 'Memória Zen',
       'Encontre os 8 pares com calma. Ótimo para acalmar a mente.',
       'Foco', const Color(0xFFB98CF0), () => const MemoriaScreen()),
+  InfoJogo('plastico', '🟦', 'Plástico Bolha',
+      'Estoure quantas bolhas quiser. Arraste o dedo para estourar várias.',
+      'Relaxante', const Color(0xFF5FD3E8), () => const PlasticoBolhaScreen()),
+  InfoJogo('jardim', '🌷', 'Jardim Zen',
+      'Toque na grama para plantar flores que crescem e balançam ao vento.',
+      'Relaxante', const Color(0xFF7BD389), () => const JardimZenScreen()),
+  InfoJogo('mandala', '🎨', 'Mandala Mágica',
+      'Desenhe com o dedo e veja tudo virar uma mandala simétrica.',
+      'Relaxante', const Color(0xFFFF8FB1), () => const MandalaScreen()),
+  InfoJogo('aquario', '🐠', 'Aquário da Calma',
+      'Alimente os peixinhos e observe eles nadarem devagar.',
+      'Relaxante', const Color(0xFF4FA3D9), () => const AquarioScreen()),
 ];
 
+InfoJogo infoJogo(String id) => jogos.firstWhere((j) => j.id == id);
+
 class JogoTab extends StatefulWidget {
-  const JogoTab({super.key});
+  final VoidCallback? irParaMovimento;
+  const JogoTab({super.key, this.irParaMovimento});
 
   @override
   State<JogoTab> createState() => _JogoTabState();
@@ -35,6 +52,7 @@ class JogoTab extends StatefulWidget {
 
 class _JogoTabState extends State<JogoTab> {
   Map<String, int> _recordes = {};
+  int _atividades = 0;
 
   @override
   void initState() {
@@ -44,12 +62,39 @@ class _JogoTabState extends State<JogoTab> {
 
   Future<void> _atualizar() async {
     try {
-      final r = await Repo.recordesPorJogo();
-      if (mounted) setState(() => _recordes = r);
+      final r = await Future.wait([Repo.recordesPorJogo(), Repo.totalAtividades()]);
+      if (mounted) {
+        setState(() {
+          _recordes = r[0] as Map<String, int>;
+          _atividades = r[1] as int;
+        });
+      }
     } catch (_) {}
   }
 
   Future<void> _abrir(InfoJogo j) async {
+    if (!jogoLiberado(j.id, _atividades)) {
+      final falta = atividadesParaLiberar(j.id) - _atividades;
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('🔒 ${j.nome}'),
+          content: Text('Complete mais $falta atividade${falta == 1 ? '' : 's'} de movimento '
+              '(caminhada, corrida, alongamento ou treino) para liberar este jogo.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Depois')),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                widget.irParaMovimento?.call();
+              },
+              child: const Text('Ir para Movimento'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     Repo.log('tela', {'nome': 'jogo_${j.id}'});
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => j.tela(), fullscreenDialog: true),
@@ -60,6 +105,8 @@ class _JogoTabState extends State<JogoTab> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final desafios = jogos.where((j) => j.tipo != 'Relaxante');
+    final relaxantes = jogos.where((j) => j.tipo == 'Relaxante');
     return RefreshIndicator(
       onRefresh: _atualizar,
       child: ListView(
@@ -78,8 +125,20 @@ class _JogoTabState extends State<JogoTab> {
             style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 16),
-          for (final j in jogos) ...[
-            _CartaoJogo(j, _recordes[j.id] ?? 0, () => _abrir(j)),
+          Text('🎯 Desafios', style: t.titleMedium),
+          const SizedBox(height: 8),
+          for (final j in desafios) ...[
+            _CartaoJogo(j, _recordes[j.id] ?? 0, true, 0, () => _abrir(j)),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 8),
+          Text('🌿 Para relaxar', style: t.titleMedium),
+          const Text('Sem perder, sem pressa. Alguns são liberados com atividades de Movimento.',
+              style: TextStyle(color: Colors.white60, fontSize: 13)),
+          const SizedBox(height: 8),
+          for (final j in relaxantes) ...[
+            _CartaoJogo(j, _recordes[j.id] ?? 0, jogoLiberado(j.id, _atividades),
+                atividadesParaLiberar(j.id), () => _abrir(j)),
             const SizedBox(height: 12),
           ],
         ],
@@ -91,53 +150,63 @@ class _JogoTabState extends State<JogoTab> {
 class _CartaoJogo extends StatelessWidget {
   final InfoJogo j;
   final int recorde;
+  final bool liberado;
+  final int requer;
   final VoidCallback aoTocar;
-  const _CartaoJogo(this.j, this.recorde, this.aoTocar);
+  const _CartaoJogo(this.j, this.recorde, this.liberado, this.requer, this.aoTocar);
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Cores.card,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: aoTocar,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: j.cor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(18),
+    return Opacity(
+      opacity: liberado ? 1 : 0.6,
+      child: Material(
+        color: Cores.card,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: aoTocar,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: j.cor.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                alignment: Alignment.center,
+                child: Text(liberado ? j.emoji : '🔒', style: const TextStyle(fontSize: 34)),
               ),
-              alignment: Alignment.center,
-              child: Text(j.emoji, style: const TextStyle(fontSize: 34)),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(j.nome, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text(j.descricao, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 6),
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: j.cor.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(99),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(j.nome, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text(j.descricao, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: j.cor.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(j.tipo, style: TextStyle(color: j.cor, fontSize: 12)),
                     ),
-                    child: Text(j.tipo, style: TextStyle(color: j.cor, fontSize: 12)),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('🏆 $recorde', style: const TextStyle(color: Cores.ouro, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        liberado ? '🏆 $recorde' : '🚶 Libera com $requer atividade${requer == 1 ? '' : 's'}',
+                        style: const TextStyle(color: Cores.ouro, fontSize: 13),
+                      ),
+                    ),
+                  ]),
                 ]),
-              ]),
-            ),
-            const Icon(Icons.play_circle_fill, size: 40, color: Cores.ouro),
-          ]),
+              ),
+              Icon(liberado ? Icons.play_circle_fill : Icons.lock_outline, size: 40, color: Cores.ouro),
+            ]),
+          ),
         ),
       ),
     );

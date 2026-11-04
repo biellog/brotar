@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets/compartilhar.dart';
 import 'checkin_sheet.dart';
 import 'jogos_tab.dart';
+import 'movimento.dart';
 import 'perfil_screen.dart';
 import 'sos_screen.dart';
 
@@ -52,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (nova != null && mounted) await Atualizacao.mostrarDialogo(context, nova);
   }
 
-  static const _nomesAbas = ['inicio', 'jogo', 'sos', 'perfil'];
+  static const _nomesAbas = ['inicio', 'jogo', 'movimento', 'sos', 'perfil'];
 
   void _irPara(int i) {
     setState(() {
@@ -66,7 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final telas = [
       InicioTab(key: ValueKey('inicio$_versao'), irPara: _irPara, novaVersao: _novaVersao),
-      const JogoTab(),
+      JogoTab(irParaMovimento: () => _irPara(2)),
+      MovimentoTab(irParaJogos: () => _irPara(1)),
       SosScreen(irParaJogo: () => _irPara(1)),
       PerfilScreen(key: ValueKey('perfil$_versao')),
     ];
@@ -77,7 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: _irPara,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
-          NavigationDestination(icon: Icon(Icons.sports_esports_outlined), selectedIcon: Icon(Icons.sports_esports), label: 'Jogo'),
+          NavigationDestination(icon: Icon(Icons.sports_esports_outlined), selectedIcon: Icon(Icons.sports_esports), label: 'Jogos'),
+          NavigationDestination(icon: Icon(Icons.directions_walk_outlined), selectedIcon: Icon(Icons.directions_walk), label: 'Mover'),
           NavigationDestination(icon: Icon(Icons.sos_outlined, color: Cores.perigo), selectedIcon: Icon(Icons.sos, color: Cores.perigo), label: 'SOS'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
         ],
@@ -157,7 +160,7 @@ class _InicioTabState extends State<InicioTab> {
     for (final c in conquistasLista) {
       if (!ja.contains(c.codigo) && c.regra(ctx)) {
         await Repo.desbloquear(c.codigo);
-        await Repo.somarXp(100);
+        await Repo.somarXp(100, 'conquista');
         if (!mounted) return;
         await _mostrarConquista(c);
       }
@@ -197,7 +200,7 @@ class _InicioTabState extends State<InicioTab> {
   Future<void> _missaoAgua() async {
     if (_hoje.contains('missao_agua')) return;
     await Repo.log('missao_agua');
-    await Repo.somarXp(5);
+    await Repo.somarXp(5, 'agua');
     _carregar();
   }
 
@@ -218,7 +221,7 @@ class _InicioTabState extends State<InicioTab> {
     );
     if (ok == true) {
       await Repo.registrarRecaida();
-      await Repo.somarXp(10); // honestidade também conta
+      await Repo.somarXp(10, 'recaida'); // honestidade também conta (1x por dia)
       _carregar();
     }
   }
@@ -334,6 +337,7 @@ class _InicioTabState extends State<InicioTab> {
                 const ListTile(title: Text('🎯 Missões de hoje', style: TextStyle(fontWeight: FontWeight.bold))),
                 _Missao('Fazer o check-in diário', '+20 XP', _hoje.contains('checkin'), _abrirCheckin),
                 _Missao('Jogar um dos jogos', '+XP', _hoje.contains('partida'), () => widget.irPara(1)),
+                _Missao('Mexer o corpo (Movimento)', '+30 XP', _hoje.contains('atividade'), () => widget.irPara(2)),
                 _Missao('Beber um copo d\'água 💧', '+5 XP', _hoje.contains('missao_agua'), _missaoAgua),
               ]),
             ),
@@ -359,7 +363,7 @@ class _InicioTabState extends State<InicioTab> {
           const SizedBox(height: 16),
           FilledButton.icon(
             style: FilledButton.styleFrom(backgroundColor: Cores.perigo),
-            onPressed: () => widget.irPara(2),
+            onPressed: () => widget.irPara(3),
             icon: const Icon(Icons.sos),
             label: const Text('Estou com vontade agora'),
           ),

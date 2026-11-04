@@ -3,6 +3,9 @@ import 'package:fica_sobrio/data/musica.dart';
 import 'package:fica_sobrio/games/bolhas.dart';
 import 'package:fica_sobrio/games/comum.dart';
 import 'package:fica_sobrio/games/memoria.dart';
+import 'package:fica_sobrio/games/relaxantes.dart';
+import 'package:fica_sobrio/logic/movimento.dart';
+import 'package:fica_sobrio/screens/movimento.dart';
 import 'package:fica_sobrio/games/tempestade.dart';
 import 'package:fica_sobrio/screens/jogos_tab.dart';
 import 'package:fica_sobrio/theme.dart';
@@ -17,6 +20,14 @@ Future<void> main() async {
     'tempestade' => const TempestadeScreen(),
     'bolhas' => const BolhasScreen(),
     'memoria' => const MemoriaScreen(),
+    'plastico' => const PlasticoBolhaScreen(),
+    'jardim' => const JardimZenScreen(),
+    'mandala' => const MandalaScreen(),
+    'aquario' => const AquarioScreen(),
+    'movimento' => Scaffold(body: SafeArea(child: MovimentoTab(irParaJogos: () {}))),
+    'alongamento' => AtividadeGuiadaScreen(atividade: atividades[2]),
+    'treino' => AtividadeGuiadaScreen(atividade: atividades[3]),
+    'caminhada' => AtividadePassosScreen(atividade: atividades[0]),
     'som' => Scaffold(body: Builder(builder: (c) {
         WidgetsBinding.instance.addPostFrameCallback((_) => abrirConfigSom(c));
         return const SizedBox.expand();

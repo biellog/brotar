@@ -52,20 +52,27 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     final dur = _segundos;
     setState(() => _ativo = false);
     final messenger = ScaffoldMessenger.of(context);
+    var xp = 0;
     try {
-      await Repo.registrarFissura(
+      xp = await Repo.registrarFissura(
         intensidade: _intensidade.round(),
         gatilho: _gatilho,
         superou: superou,
         duracaoSeg: dur,
       );
-      if (superou) await Repo.somarXp(50);
     } catch (_) {}
-    messenger.showSnackBar(SnackBar(
-      content: Text(superou
-          ? 'Você surfou a onda! 🌊 +50 XP. Tenha orgulho disso.'
-          : 'Obrigado por registrar. Amanhã é um novo dia, e você não está sozinho. 💚'),
-    ));
+    final String texto;
+    if (!superou) {
+      texto = 'Obrigado por registrar. Amanhã é um novo dia, e você não está sozinho. 💚';
+    } else if (xp > 0) {
+      texto = 'Você surfou a onda! 🌊 +$xp XP. Tenha orgulho disso.';
+    } else if (dur < Repo.minimoSosSeg) {
+      texto = 'Que bom que passou! 🌊 O XP vale quando você surfa a onda por pelo menos 1min30.';
+    } else {
+      texto = 'Você surfou a onda! 🌊 O XP do SOS já foi ganho agora há pouco '
+          '(vale até 3 vezes por dia, a cada 30 min). A vitória continua sendo sua.';
+    }
+    messenger.showSnackBar(SnackBar(content: Text(texto), duration: const Duration(seconds: 5)));
   }
 
   Future<void> _abrir(String url, String tipo) async {
@@ -170,7 +177,10 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
           FilledButton.icon(
             onPressed: () => _encerrar(true),
             icon: const Icon(Icons.emoji_events),
-            label: const Text('Passou! Venci a fissura (+50 XP)'),
+            label: Text(_segundos >= Repo.minimoSosSeg
+                ? 'Passou! Venci a fissura (+50 XP)'
+                : 'Passou! Venci a fissura (XP em ${(Repo.minimoSosSeg - _segundos) ~/ 60}:'
+                    '${((Repo.minimoSosSeg - _segundos) % 60).toString().padLeft(2, '0')})'),
           ),
           TextButton(onPressed: () => _encerrar(false), child: const Text('Não consegui desta vez')),
         ],

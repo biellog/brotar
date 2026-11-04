@@ -56,7 +56,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'motivo': _motivo.text.trim(),
         'onboarding_ok': true,
       });
-      await Repo.somarXp(50);
+      await Repo.somarXp(50, 'onboarding');
       if (_convite.text.trim().isNotEmpty) {
         final ok = await Repo.usarConvite(_convite.text);
         messenger.showSnackBar(SnackBar(

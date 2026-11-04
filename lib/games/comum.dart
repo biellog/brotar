@@ -129,13 +129,20 @@ Future<bool> finalizarPartida(
 }) async {
   var recordeAnterior = 0;
   var xp = 0;
+  var limiteAtingido = false;
   String? codigo;
   try {
     recordeAnterior = await Repo.recorde(jogo);
     await Repo.salvarPartida(jogo, pontos, duracaoSeg);
-    xp = min(pontos ~/ 10, 300);
-    if (xp > 0 && Repo.uid != null) await Repo.somarXp(xp);
-    codigo = (await Repo.perfil())?['codigo_convite'];
+    final perfil = await Repo.perfil();
+    codigo = perfil?['codigo_convite'];
+    final pedido = min(pontos ~/ 10, 300);
+    if (pedido > 0 && Repo.uid != null) {
+      final antes = (perfil?['xp'] as num?)?.toInt() ?? 0;
+      final depois = await Repo.somarXp(pedido, 'jogo');
+      xp = max(0, depois - antes); // o que o servidor realmente deu
+      limiteAtingido = xp < pedido;
+    }
   } catch (_) {}
   if (!context.mounted) return false;
   final novoRecorde = pontos > recordeAnterior && recordeAnterior > 0;
@@ -149,6 +156,15 @@ Future<bool> finalizarPartida(
         const Text('pontos'),
         const SizedBox(height: 8),
         Text('+$xp XP', style: const TextStyle(color: Cores.ouro, fontWeight: FontWeight.bold)),
+        if (limiteAtingido)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Você chegou no limite de XP dos jogos de hoje. Pode continuar jogando à vontade! 😊',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+          ),
         const SizedBox(height: 8),
         Text(
           mensagemExtra ?? 'Foram $duracaoSeg segundos focado em outra coisa. Isso também é vitória. 💚',

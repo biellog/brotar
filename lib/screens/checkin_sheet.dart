@@ -58,7 +58,7 @@ class _CheckinSheetState extends State<_CheckinSheet> {
         sobrio: _sobrio,
         nota: _nota.text.trim().isEmpty ? null : _nota.text.trim(),
       );
-      if (!_jaFeito) await Repo.somarXp(20);
+      if (!_jaFeito) await Repo.somarXp(20, 'checkin');
       nav.pop(true);
     } catch (e) {
       if (!mounted) return;

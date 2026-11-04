@@ -120,9 +120,12 @@ class Repo {
     await log('perfil_atualizado', {'campos': campos.keys.toList()});
   }
 
-  static Future<int> somarXp(int qtd) async {
-    final r = await _db.rpc('somar_xp', params: {'qtd': qtd});
-    await log('xp_ganho', {'qtd': qtd});
+  /// Pede XP ao servidor. O servidor aplica limites diários por [motivo]
+  /// (checkin, agua, recaida, jogo, movimento, conquista...), então repetir
+  /// a mesma ação não gera XP infinito.
+  static Future<int> somarXp(int qtd, [String motivo = 'outro']) async {
+    final r = await _db.rpc('somar_xp', params: {'qtd': qtd, 'motivo': motivo});
+    await log('xp_ganho', {'qtd': qtd, 'motivo': motivo});
     return (r as num?)?.toInt() ?? 0;
   }
 
@@ -213,23 +216,32 @@ class Repo {
   }
 
   // ---------------- Fissura (SOS) ----------------
-  static Future<void> registrarFissura({
+  /// Segundos mínimos surfando a onda para o "venci a fissura" valer XP.
+  static const minimoSosSeg = 90;
+
+  /// Registra o momento de fissura. Retorna o XP ganho (0 ou 50).
+  /// Quem decide é o servidor: precisa de 90 s, no máximo 3 por dia e 30 min de intervalo.
+  static Future<int> registrarFissura({
     required int intensidade,
     String? gatilho,
     required bool superou,
     required int duracaoSeg,
   }) async {
-    await _db.from('fissuras').insert({
+    final r = await _db.rpc('vencer_fissura', params: {
       'intensidade': intensidade,
       'gatilho': gatilho,
       'superou': superou,
       'duracao_seg': duracaoSeg,
     });
+    final xp = (r as num?)?.toInt() ?? 0;
     await log('fissura', {
       'intensidade': intensidade,
       'gatilho': gatilho,
       'superou': superou,
+      'duracao_seg': duracaoSeg,
+      'xp': xp,
     });
+    return xp;
   }
 
   static Future<int> fissurasVencidas() async {
@@ -238,8 +250,34 @@ class Repo {
         .select('id')
         .eq('user_id', uid!)
         .eq('superou', true)
+        .gte('duracao_seg', minimoSosSeg) // cliques rápidos não contam para conquista
         .count();
     return r.count;
+  }
+
+  // ---------------- Movimento ----------------
+  static Future<void> registrarAtividade(String tipo, int duracaoSeg, int passos) async {
+    if (uid == null) return;
+    await _db.from('atividades').insert({'tipo': tipo, 'duracao_seg': duracaoSeg, 'passos': passos});
+    await log('atividade', {'tipo': tipo, 'duracao_seg': duracaoSeg, 'passos': passos});
+  }
+
+  static Future<int> totalAtividades() async {
+    if (uid == null) return 0;
+    final r = await _db.from('atividades').select('id').eq('user_id', uid!).count();
+    return r.count;
+  }
+
+  /// Quantas vezes cada atividade foi concluída: {'caminhada': 3, ...}
+  static Future<Map<String, int>> atividadesPorTipo() async {
+    if (uid == null) return {};
+    final rows = await _db.from('atividades').select('tipo').eq('user_id', uid!).limit(1000);
+    final m = <String, int>{};
+    for (final r in rows) {
+      final t = r['tipo'] as String;
+      m[t] = (m[t] ?? 0) + 1;
+    }
+    return m;
   }
 
   // ---------------- Conquistas ----------------
