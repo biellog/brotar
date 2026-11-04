@@ -11,6 +11,7 @@ import 'package:fica_sobrio/games/tempestade.dart';
 import 'package:fica_sobrio/games/tycoon/tycoon_screen.dart';
 import 'package:fica_sobrio/screens/jogos_tab.dart';
 import 'package:fica_sobrio/theme.dart';
+import 'package:fica_sobrio/widgets/cartao_compartilhar.dart';
 import 'package:fica_sobrio/widgets/painel_gastos.dart';
 import 'package:flutter/material.dart';
 
@@ -27,6 +28,18 @@ Future<void> main() async {
     'jardim' => const JardimMagicoScreen(),
     'mandala' => const MandalaScreen(),
     'tycoon' => const TycoonScreen(),
+    'cartao' => Scaffold(
+        backgroundColor: Colors.white,
+        body: GridView.count(crossAxisCount: 2, children: [
+          for (final (d, h, e, c) in const [(0, 7, 0.0, null), (1, 3, 25.0, null), (43, 5, 1290.0, null), (400, 1, 12000.0, '🏆')])
+            FutureBuilder(
+              future: gerarCartaoSobriedade(
+                  tempo: Duration(days: d, hours: h), economia: e,
+                  conquistaEmoji: c, conquistaTitulo: c == null ? null : 'Noventa Dias', codigoConvite: 'K7Q2ZP'),
+              builder: (_, s) => s.hasData ? Image.memory(s.data!) : const SizedBox(),
+            ),
+        ]),
+      ),
     'painel' => Scaffold(body: SafeArea(child: ListView(padding: const EdgeInsets.all(16), children: [PainelGastos(gastoDiario: 25, aoSalvar: (_) async {})]))),
     'aquario' => const AquarioScreen(),
     'movimento' => Scaffold(body: SafeArea(child: MovimentoTab(irParaJogos: () {}))),

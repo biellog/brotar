@@ -66,6 +66,7 @@ class _TycoonScreenState extends State<TycoonScreen> with SingleTickerProviderSt
   final _chaveRaiz = GlobalKey();
   final _chaveDinheiro = GlobalKey();
   final _chaveRush = GlobalKey();
+  final _chaveLista = GlobalKey();
   final _chavesIcone = List.generate(produtos.length, (_) => GlobalKey());
   late final Ticker _ticker;
   late final AppLifecycleListener _ciclo;
@@ -170,9 +171,12 @@ class _TycoonScreenState extends State<TycoonScreen> with SingleTickerProviderSt
 
     // moedas voando + som (com limite para não virar barulho)
     final destino = _centro(_chaveDinheiro);
+    final areaLista = _retangulo(_chaveLista)?.deflate(12);
     for (final v in vendas) {
       final de = _centro(_chavesIcone[v.produto]);
-      if (de != null && destino != null && _moedas.length < 14) {
+      // só sai moeda de suco que está VISÍVEL (a lista guarda cartões fora da tela)
+      final visivel = de != null && areaLista != null && areaLista.contains(de);
+      if (visivel && destino != null && _moedas.length < 14 && _m.rush <= 0) {
         _moedas.add(_Moeda(de, destino, 0));
       }
     }
@@ -734,6 +738,7 @@ class _TycoonScreenState extends State<TycoonScreen> with SingleTickerProviderSt
               _faixaMissao(),
               _modosDeCompra(),
               Expanded(
+                key: _chaveLista,
                 child: Stack(children: [
                   ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),

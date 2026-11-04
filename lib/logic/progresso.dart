@@ -163,3 +163,66 @@ String? oQueDaPraComprar(double valor) {
   }
   return melhor;
 }
+
+// ---------------- Textos do contador e do cartão de compartilhar ----------------
+/// Número grande + unidade: "43 dias", "1 dia", "7 horas", "12 minutos".
+(int, String) tempoPrincipal(Duration t) {
+  if (t.inDays >= 1) return (t.inDays, t.inDays == 1 ? 'dia' : 'dias');
+  if (t.inHours >= 1) return (t.inHours, t.inHours == 1 ? 'hora' : 'horas');
+  return (t.inMinutes, t.inMinutes == 1 ? 'minuto' : 'minutos');
+}
+
+/// Complemento: "e 7 horas e 12 minutos" (ou "e 12 minutos").
+String tempoDetalhe(Duration t) {
+  String p(int n, String um, String varios) => '$n ${n == 1 ? um : varios}';
+  final h = t.inHours % 24, m = t.inMinutes % 60;
+  if (t.inDays >= 1) return 'e ${p(h, 'hora', 'horas')} e ${p(m, 'minuto', 'minutos')}';
+  if (t.inHours >= 1) return 'e ${p(m, 'minuto', 'minutos')}';
+  return 'Todo grande caminho começa assim 🌱';
+}
+
+const _marcosDias = [1, 3, 7, 14, 30, 60, 90, 180, 365, 730, 1095, 1825, 3650];
+
+String _nomeMarco(int d) => switch (d) {
+      1 => '1 dia',
+      7 => '1 semana',
+      14 => '2 semanas',
+      30 => '1 mês',
+      60 => '2 meses',
+      90 => '3 meses',
+      180 => '6 meses',
+      365 => '1 ano',
+      730 => '2 anos',
+      1095 => '3 anos',
+      1825 => '5 anos',
+      3650 => '10 anos',
+      _ => '$d dias',
+    };
+
+/// "🎯 Faltam 3 dias para 1 semana!"
+String proximoMarcoTexto(Duration t) {
+  final dias = t.inDays;
+  final prox = _marcosDias.where((m) => m > dias).firstOrNull;
+  if (prox == null) return '👑 Você é uma lenda. Continue!';
+  final falta = prox - dias;
+  if (prox == 1) {
+    final horas = 24 - t.inHours;
+    return horas == 1 ? '🎯 Falta 1 hora para o seu primeiro dia!' : '🎯 Faltam $horas horas para o seu primeiro dia!';
+  }
+  return falta == 1 ? '🎯 Falta 1 dia para ${_nomeMarco(prox)}!' : '🎯 Faltam $falta dias para ${_nomeMarco(prox)}!';
+}
+
+/// Frase de comemoração para o cartão de compartilhar.
+String fraseDoMarco(int dias) {
+  if (dias == 0) return 'Hoje começa a minha nova história.';
+  if (dias == 1) return 'O primeiro dia é o mais importante!';
+  if (dias < 7) return 'Um dia de cada vez. E estou vencendo!';
+  if (dias < 14) return 'Uma semana inteira! 💪';
+  if (dias < 30) return 'Mais de duas semanas firme!';
+  if (dias < 60) return 'Um mês de vitória! 🏅';
+  if (dias < 90) return 'Dois meses de força!';
+  if (dias < 180) return 'Três meses: virei outra pessoa.';
+  if (dias < 365) return 'Meio ano de vida nova! 🌳';
+  if (dias < 730) return 'UM ANO SÓBRIO! 👑';
+  return 'Anos de vitória. Um dia de cada vez.';
+}

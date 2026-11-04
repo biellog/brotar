@@ -8,7 +8,7 @@ import '../data/notificacoes.dart';
 import '../data/repo.dart';
 import '../logic/progresso.dart';
 import '../theme.dart';
-import '../widgets/compartilhar.dart';
+import '../widgets/cartao_compartilhar.dart';
 import '../widgets/painel_gastos.dart';
 import 'checkin_sheet.dart';
 import 'jogos_tab.dart';
@@ -181,8 +181,10 @@ class _InicioTabState extends State<InicioTab> {
           ]),
           actions: [
             TextButton(
-              onPressed: () => compartilhar(
-                'Desbloqueei "${c.titulo}" ${c.emoji} no Fica Sóbrio: ${c.descricao}!',
+              onPressed: () => compartilharConquistaDeTempo(
+                tempo: tempoSobrio(_inicio),
+                conquistaEmoji: c.emoji,
+                conquistaTitulo: c.titulo,
                 codigoConvite: _perfil?['codigo_convite'],
                 origem: 'conquista_${c.codigo}',
               ),
@@ -279,17 +281,24 @@ class _InicioTabState extends State<InicioTab> {
               ),
             ),
             child: Column(children: [
-              const Text('VOCÊ ESTÁ SÓBRIO HÁ', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
-              Text('${tempo.inDays}',
+              const Text('🌱 Seu tempo sóbrio', style: TextStyle(fontSize: 16, color: Colors.white70)),
+              Text('${tempoPrincipal(tempo).$1}',
                   style: t.displayLarge?.copyWith(fontWeight: FontWeight.w900, color: Colors.white)),
-              Text(tempo.inDays == 1 ? 'dia' : 'dias', style: t.titleLarge),
+              Text(tempoPrincipal(tempo).$2, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('${tempo.inHours % 24}h ${tempo.inMinutes % 60}min',
-                  style: const TextStyle(color: Colors.white70)),
-              const SizedBox(height: 12),
+              Text(tempoDetalhe(tempo), style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(20)),
+                child: Text(proximoMarcoTexto(tempo),
+                    textAlign: TextAlign.center, style: const TextStyle(color: Cores.ouro, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => compartilhar(
-                  'Estou há ${tempo.inDays} dias sóbrio e já economizei ${dinheiro(economia)}! 💪',
+                onPressed: () => compartilharConquistaDeTempo(
+                  tempo: tempo,
+                  economia: economia.toDouble(),
                   codigoConvite: _perfil?['codigo_convite'],
                   origem: 'contador',
                 ),

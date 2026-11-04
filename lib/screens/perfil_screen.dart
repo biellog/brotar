@@ -6,7 +6,7 @@ import '../data/repo.dart';
 import '../games/comum.dart';
 import '../logic/progresso.dart';
 import '../theme.dart';
-import '../widgets/compartilhar.dart';
+import '../widgets/cartao_compartilhar.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -175,8 +175,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   ),
                 ]),
                 FilledButton.icon(
-                  onPressed: () => compartilhar(
-                    'Estou usando o Fica Sóbrio pra me manter firme — é um jogo que conta seus dias sóbrio. Bora comigo?',
+                  onPressed: () => compartilharConquistaDeTempo(
+                    tempo: tempoSobrio(inicio ?? DateTime.now()),
                     codigoConvite: codigo,
                     origem: 'convite',
                   ),
