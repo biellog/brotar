@@ -8,7 +8,7 @@ import '../games/jardim_magico.dart';
 import '../games/memoria.dart';
 import '../games/relaxantes.dart';
 import '../games/tempestade.dart';
-import '../games/tycoon/tycoon_screen.dart';
+import '../games/tycoon3d/tycoon3d_screen.dart';
 import '../logic/movimento.dart';
 import '../theme.dart';
 
@@ -23,9 +23,9 @@ final jogos = <InfoJogo>[
   InfoJogo('brilha', '🌟', 'Brilha Junto',
       'ONLINE: voe como vagalume, colete luzes e brilhe junto com pessoas do Brasil todo. Ninguém perde!',
       'Online', const Color(0xFFFFD166), () => const BrilhaScreen()),
-  InfoJogo('tycoon', '🧃', 'Império do Suco',
-      'Comece com uma barraca de limonada e monte um império de sucos. Contrate gerentes, abra filiais!',
-      'Simulador', const Color(0xFFFF9F1C), () => const TycoonScreen()),
+  InfoJogo('tycoon', '🧃', 'Império do Suco 3D',
+      'Mundo aberto em 3D: ande pela praça, faça sucos, venda no balcão, contrate ajudantes e abra 8 barracas!',
+      'Simulador', const Color(0xFFFF9F1C), () => const Tycoon3dScreen()),
   InfoJogo('tempestade', '⛈️', 'Desvia da Tempestade',
       'Arraste para pegar estrelas, gotas e trevos e fugir das tempestades.',
       'Agilidade', const Color(0xFF1FAF7A), () => const TempestadeScreen()),

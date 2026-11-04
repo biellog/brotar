@@ -218,11 +218,11 @@ class RedeBrilha {
   static const canalDiretorio = 'brilha-diretorio';
 
   /// Acompanha, ao vivo, as salas abertas (para "Achar partidas" e o contador do saguão).
-  static Future<void Function()> observarSalas(void Function(List<SalaInfo> salas, int totalOnline) aoMudar) async {
+  static Future<Future<void> Function()> observarSalas(void Function(List<SalaInfo> salas, int totalOnline) aoMudar) async {
     final db = _db;
     if (db == null) {
       aoMudar(agruparSalas(const []), 0);
-      return () {};
+      return () async {};
     }
     final canal = db.channel(canalDiretorio);
     canal
@@ -231,6 +231,10 @@ class RedeBrilha {
         aoMudar(agruparSalas(todas), todas.length);
       })
       ..subscribe();
-    return () => db.removeChannel(canal);
+    return () async {
+      try {
+        await db.removeChannel(canal);
+      } catch (_) {}
+    };
   }
 }

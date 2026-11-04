@@ -9,7 +9,7 @@ import 'package:fica_sobrio/games/relaxantes.dart';
 import 'package:fica_sobrio/logic/movimento.dart';
 import 'package:fica_sobrio/screens/movimento.dart';
 import 'package:fica_sobrio/games/tempestade.dart';
-import 'package:fica_sobrio/games/tycoon/tycoon_screen.dart';
+import 'package:fica_sobrio/games/tycoon3d/tycoon3d_screen.dart';
 import 'package:fica_sobrio/screens/jogos_tab.dart';
 import 'package:fica_sobrio/theme.dart';
 import 'package:fica_sobrio/widgets/cartao_compartilhar.dart';
@@ -28,7 +28,7 @@ Future<void> main() async {
     'plastico' => const PlasticoBolhaScreen(),
     'jardim' => const JardimMagicoScreen(),
     'mandala' => const MandalaScreen(),
-    'tycoon' => const TycoonScreen(),
+    'tycoon' => const Tycoon3dScreen(),
     'brilha' => const BrilhaScreen(),
     'cartao' => Scaffold(
         backgroundColor: Colors.white,

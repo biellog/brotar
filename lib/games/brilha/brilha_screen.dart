@@ -64,7 +64,7 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
   int _onlineGeral = 0;
   List<SalaInfo> _salas = const [];
   final _salasNotifier = ValueNotifier<List<SalaInfo>>(const []);
-  void Function()? _pararContagem;
+  Future<void> Function()? _pararContagem;
   bool _salaPublica = true;
 
   // jogo
@@ -130,8 +130,10 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
     _salaPublica = sala == 'geral' || publica;
     Musica.efeito(Efeito.brRodada);
     HapticFeedback.mediumImpact();
-    _pararContagem?.call();
+    // fecha o observador da lista ANTES de entrar (os dois usam o canal do diretório)
+    final parar = _pararContagem;
     _pararContagem = null;
+    await parar?.call();
     final m = MotorBrilha(sala)..sincronizarRodada(DateTime.now());
     m.entrar(_meuId, _meuNome, _minhaCor, eu: true);
     m.ajustarBots(8);
@@ -843,7 +845,12 @@ class _CartaoSala extends StatelessWidget {
             ),
           ]),
         ),
-        FilledButton(onPressed: aoEntrar, child: const Text('Entrar')),
+        // tamanho próprio: o tema do app deixa botões com a largura inteira da tela
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(88, 44), padding: const EdgeInsets.symmetric(horizontal: 16)),
+          onPressed: aoEntrar,
+          child: const Text('Entrar'),
+        ),
       ]),
     );
   }
