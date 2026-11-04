@@ -229,12 +229,38 @@ def calor():
     return x
 
 
+def luz(n):
+    """'Plim' de marimba suave (3 alturas da escala pentatônica)."""
+    f = hz([84, 86, 88][n])
+    tt = t(0.32)
+    corpo = np.sin(2 * np.pi * f * tt) + 0.35 * np.sin(2 * np.pi * f * 4 * tt) * np.exp(-tt * 30)
+    return env(corpo, 0.002, 13)
+
+
+def dupla():
+    """Acorde de duas vozes brilhando juntas (quinta + oitava)."""
+    x = np.zeros(int(0.8 * SR))
+    for k, m in enumerate([79, 86, 91]):
+        colocar(x, sino(hz(m), 0.7, 5, 0.5) * (0.6 - 0.12 * k), k * 0.06)
+    return x
+
+
+def rodada():
+    """Sino suave anunciando a rodada."""
+    x = np.zeros(int(1.4 * SR))
+    for k, m in enumerate([72, 79, 84, 88]):
+        colocar(x, sino(hz(m), 1.1, 3.2, 0.6) * (0.55 - 0.08 * k), k * 0.11)
+    return x
+
+
 if __name__ == "__main__":
     pasta = sys.argv[1]
     for nome, fn in [("ty_moeda", moeda), ("ty_caixa", caixa), ("ty_compra", compra), ("ty_marco", marco),
                      ("ty_gerente", gerente), ("ty_filial", filial), ("ty_toque", toque),
                      ("ty_rush", rush), ("ty_gema", gema), ("ty_missao", missao), ("ty_bau", bau), ("ty_calor", calor),
                      ("ty_combo1", lambda: combo(0)), ("ty_combo2", lambda: combo(1)),
-                     ("ty_combo3", lambda: combo(2)), ("ty_combo4", lambda: combo(3))]:
+                     ("ty_combo3", lambda: combo(2)), ("ty_combo4", lambda: combo(3)),
+                     ("br_luz1", lambda: luz(0)), ("br_luz2", lambda: luz(1)), ("br_luz3", lambda: luz(2)),
+                     ("br_dupla", dupla), ("br_rodada", rodada)]:
         salvar(nome, fn(), pasta)
         print(nome)

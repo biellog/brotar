@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/repo.dart';
 import '../games/bolhas.dart';
+import '../games/brilha/brilha_screen.dart';
 import '../games/comum.dart';
 import '../games/jardim_magico.dart';
 import '../games/memoria.dart';
@@ -19,6 +20,9 @@ class InfoJogo {
 }
 
 final jogos = <InfoJogo>[
+  InfoJogo('brilha', '🌟', 'Brilha Junto',
+      'ONLINE: voe como vagalume, colete luzes e brilhe junto com pessoas do Brasil todo. Ninguém perde!',
+      'Online', const Color(0xFFFFD166), () => const BrilhaScreen()),
   InfoJogo('tycoon', '🧃', 'Império do Suco',
       'Comece com uma barraca de limonada e monte um império de sucos. Contrate gerentes, abra filiais!',
       'Simulador', const Color(0xFFFF9F1C), () => const TycoonScreen()),
@@ -110,8 +114,9 @@ class _JogoTabState extends State<JogoTab> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final online = jogos.where((j) => j.tipo == 'Online');
     final simuladores = jogos.where((j) => j.tipo == 'Simulador');
-    final desafios = jogos.where((j) => j.tipo != 'Relaxante' && j.tipo != 'Simulador');
+    final desafios = jogos.where((j) => !const {'Relaxante', 'Simulador', 'Online'}.contains(j.tipo));
     final relaxantes = jogos.where((j) => j.tipo == 'Relaxante');
     return RefreshIndicator(
       onRefresh: _atualizar,
@@ -131,6 +136,21 @@ class _JogoTabState extends State<JogoTab> {
             style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 16),
+          Row(children: [
+            Text('🌐 Online', style: t.titleMedium),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: Cores.perigo, borderRadius: BorderRadius.circular(10)),
+              child: const Text('NOVO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          for (final j in online) ...[
+            _CartaoJogo(j, _recordes[j.id] ?? 0, true, 0, () => _abrir(j)),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 8),
           Text('🏪 Simulador', style: t.titleMedium),
           const SizedBox(height: 8),
           for (final j in simuladores) ...[

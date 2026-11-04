@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets/cartao_compartilhar.dart';
 import '../widgets/painel_gastos.dart';
 import 'checkin_sheet.dart';
+import '../games/brilha/brilha_screen.dart';
 import 'jogos_tab.dart';
 import 'movimento.dart';
 import 'perfil_screen.dart';
@@ -316,6 +317,12 @@ class _InicioTabState extends State<InicioTab> {
             _Stat('🎮', '$_recorde', 'recorde'),
           ]),
           const SizedBox(height: 12),
+          // ------- Novidade: jogo online -------
+          _BannerBrilha(aoTocar: () {
+            Repo.log('tela', {'nome': 'banner_brilha'});
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BrilhaScreen(), fullscreenDialog: true));
+          }),
+          const SizedBox(height: 12),
           // ------- Quanto o vício custa -------
           PainelGastos(
             gastoDiario: gasto.toDouble(),
@@ -431,5 +438,48 @@ class _Missao extends StatelessWidget {
         title: Text(titulo,
             style: TextStyle(decoration: feita ? TextDecoration.lineThrough : null)),
         trailing: Text(premio, style: const TextStyle(color: Cores.ouro)),
+      );
+}
+
+
+/// Banner chamativo do jogo online na tela inicial.
+class _BannerBrilha extends StatelessWidget {
+  final VoidCallback aoTocar;
+  const _BannerBrilha({required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: aoTocar,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF0B1026), Color(0xFF3A2C8F), Color(0xFF7B5CD6)]),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [BoxShadow(color: Color(0x667B5CD6), blurRadius: 18, offset: Offset(0, 4))],
+          ),
+          child: const Row(children: [
+            Text('🌟', style: TextStyle(fontSize: 40)),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text('Brilha Junto', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  SizedBox(width: 8),
+                  DecoratedBox(
+                    decoration: BoxDecoration(color: Color(0xFFFF6FA5), borderRadius: BorderRadius.all(Radius.circular(8))),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      child: Text('NOVO · ONLINE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                ]),
+                SizedBox(height: 2),
+                Text('Voe com gente do Brasil todo. Juntos, as luzes valem x2!',
+                    style: TextStyle(color: Colors.white70, fontSize: 13)),
+              ]),
+            ),
+            Icon(Icons.play_circle_fill, color: Color(0xFFFFC23D), size: 38),
+          ]),
+        ),
       );
 }

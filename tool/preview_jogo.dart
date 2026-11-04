@@ -1,6 +1,7 @@
 // Prévia dos jogos no navegador (sem Supabase), usada só para testes visuais.
 import 'package:fica_sobrio/data/musica.dart';
 import 'package:fica_sobrio/games/bolhas.dart';
+import 'package:fica_sobrio/games/brilha/brilha_screen.dart';
 import 'package:fica_sobrio/games/comum.dart';
 import 'package:fica_sobrio/games/memoria.dart';
 import 'package:fica_sobrio/games/jardim_magico.dart';
@@ -28,6 +29,7 @@ Future<void> main() async {
     'jardim' => const JardimMagicoScreen(),
     'mandala' => const MandalaScreen(),
     'tycoon' => const TycoonScreen(),
+    'brilha' => const BrilhaScreen(),
     'cartao' => Scaffold(
         backgroundColor: Colors.white,
         body: GridView.count(crossAxisCount: 2, children: [

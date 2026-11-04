@@ -138,3 +138,17 @@ jobs:
           else
             echo "::warning::O app ainda não enxerga a versão 1.0.${{ github.run_number }}. Resposta: $R"
           fi
+
+      # Prova que o jogo online (Brilha Junto) funciona no Supabase Realtime deste projeto
+      - uses: actions/setup-node@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          node-version: '22'
+      - name: Conferir jogo online (Supabase Realtime)
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/rt" && cp tool/conferir_realtime.mjs "$RUNNER_TEMP/rt/"
+          cd "$RUNNER_TEMP/rt" && npm init -y >/dev/null && npm i @supabase/supabase-js@2 >/dev/null 2>&1
+          node conferir_realtime.mjs || echo "::warning::O modo online não respondeu: confira se o Realtime está ativo no Supabase (Project Settings → Realtime)."
+
