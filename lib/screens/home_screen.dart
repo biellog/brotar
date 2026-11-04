@@ -9,6 +9,7 @@ import '../data/repo.dart';
 import '../logic/progresso.dart';
 import '../theme.dart';
 import '../widgets/compartilhar.dart';
+import '../widgets/painel_gastos.dart';
 import 'checkin_sheet.dart';
 import 'jogos_tab.dart';
 import 'movimento.dart';
@@ -305,6 +306,17 @@ class _InicioTabState extends State<InicioTab> {
             const SizedBox(width: 8),
             _Stat('🎮', '$_recorde', 'recorde'),
           ]),
+          const SizedBox(height: 12),
+          // ------- Quanto o vício custa -------
+          PainelGastos(
+            gastoDiario: gasto.toDouble(),
+            aoSalvar: (novoDiario) async {
+              try {
+                await Repo.salvarPerfil({'gasto_diario': double.parse(novoDiario.toStringAsFixed(2))});
+                if (mounted) setState(() => _perfil?['gasto_diario'] = novoDiario);
+              } catch (_) {}
+            },
+          ),
           const SizedBox(height: 12),
           // ------- Nível -------
           Card(

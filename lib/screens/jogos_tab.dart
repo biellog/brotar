@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/repo.dart';
 import '../games/bolhas.dart';
 import '../games/comum.dart';
+import '../games/jardim_magico.dart';
 import '../games/memoria.dart';
 import '../games/relaxantes.dart';
 import '../games/tempestade.dart';
@@ -29,9 +30,9 @@ final jogos = <InfoJogo>[
   InfoJogo('plastico', '🟦', 'Plástico Bolha',
       'Estoure quantas bolhas quiser. Arraste o dedo para estourar várias.',
       'Relaxante', const Color(0xFF5FD3E8), () => const PlasticoBolhaScreen()),
-  InfoJogo('jardim', '🌷', 'Jardim Zen',
-      'Toque na grama para plantar flores que crescem e balançam ao vento.',
-      'Relaxante', const Color(0xFF7BD389), () => const JardimZenScreen()),
+  InfoJogo('jardim', '🌷', 'Jardim Mágico',
+      'Plante, regue arrastando o dedo e colha flores que explodem em pétalas. Faça combos!',
+      'Relaxante', const Color(0xFF7BD389), () => const JardimMagicoScreen()),
   InfoJogo('mandala', '🎨', 'Mandala Mágica',
       'Desenhe com o dedo e veja tudo virar uma mandala simétrica.',
       'Relaxante', const Color(0xFFFF8FB1), () => const MandalaScreen()),

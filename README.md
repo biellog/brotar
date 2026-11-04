@@ -14,13 +14,14 @@ O APK é compilado **pelo GitHub** — você não precisa instalar nada no compu
 | Recurso | O que faz |
 |---|---|
 | ⏱️ Contador | Dias, horas e minutos sóbrio + dinheiro economizado |
+| 💸 Quanto o vício custa | Painel na tela inicial: gasto por dia, semana ou mês → quanto junta em 1 mês, 5 meses, 1 ano, 5 anos, 10 anos e 10 anos rendendo, e o que dá para comprar |
 | ⚡ XP e níveis | Semente → Broto → Raiz Firme → … → **Lenda Sóbria** |
 | 🎯 Missões diárias | Check-in (+20 XP), jogar, beber água (+5 XP) |
 | 🏅 15 conquistas | 24h, 7 dias, 30, 90, 365 dias, recordes no jogo, fissuras vencidas… |
-| 🎮 7 jogos | **Desafios:** Desvia da Tempestade, Bolhas da Calma, Memória Zen. **Relaxantes (sem perder):** Plástico Bolha, Jardim Zen, Mandala Mágica e Aquário da Calma, os 3 últimos liberados com atividades de Movimento. Sem bebida nem cigarro na tela |
-| 🚶 Movimento | Caminhada (1.500 passos) e corrida leve (3.000 passos) com contador de passos do celular, alongamento e treino leve guiados. Cada atividade dá +30 XP e libera jogos: 1 → Jardim Zen, 3 → Mandala, 5 → Aquário |
+| 🎮 7 jogos | **Desafios:** Desvia da Tempestade, Bolhas da Calma, Memória Zen. **Relaxantes (sem perder):** Plástico Bolha, Jardim Mágico (plantar, regar, colher com combos, flor dourada e céu que vira noite), Mandala Mágica e Aquário da Calma, os 3 últimos liberados com atividades de Movimento. Sem bebida nem cigarro na tela |
+| 🚶 Movimento | Caminhada (1.500 passos) e corrida leve (3.000 passos) com contador de passos do celular, alongamento e treino leve guiados. Cada atividade dá +30 XP e libera jogos: 1 → Jardim Mágico, 3 → Mandala, 5 → Aquário |
 | 🛡️ XP justo | O servidor limita o XP por dia (check-in, água, recaída, jogos, movimento) e o "venci a fissura" do SOS só vale com 1min30 surfando a onda, até 3x por dia, com 30 min de intervalo |
-| 🎵 Som | Música calma em loop no app inteiro (pausa quando o app sai da tela) e efeitos nos jogos: erro na Tempestade, carta virando na Memória, bolha certa e errada nas Bolhas. Volume da música e dos efeitos ajustáveis em **Perfil → Som e música** ou no botão 🎵 |
+| 🎵 Som | Música original ("Serenidade", composta para o app em `tool/compor_musica.py`) em loop no app inteiro (pausa quando o app sai da tela) e efeitos nos jogos: erro na Tempestade, carta virando na Memória, bolha certa e errada nas Bolhas. Volume da música e dos efeitos ajustáveis em **Perfil → Som e música** ou no botão 🎵 |
 | 🚀 Atualizações | O app consulta a tabela `versoes_app` no Supabase: mostra aviso, botão **Atualizar** e notificação (verificação a cada ~4 h, mesmo com o app fechado) |
 | 🆘 SOS Fissura | Registra intensidade e gatilho, respiração 4-4-6, cronômetro, CVV 188, CAPS (136), AA/NA, SAMU 192 |
 | 📓 Check-in diário | Humor, nível de vontade, diário |

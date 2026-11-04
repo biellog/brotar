@@ -11,7 +11,7 @@ void main() {
   });
 
   test('existe a música calma de fundo', () {
-    expect(File('assets/musica/calma.ogg').existsSync(), isTrue);
+    expect(File('assets/musica/serenidade.ogg').existsSync(), isTrue);
   });
 
   test('pastas de som estão declaradas no pubspec', () {

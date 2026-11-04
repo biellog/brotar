@@ -1,7 +1,9 @@
 Música de fundo do app (toca em loop em todas as telas).
 
-calma.ogg = trecho calmo (3:21,9 a 3:43,7) da música enviada, 12 compassos a 132,5 BPM,
-com transição suave na emenda do loop e volume reduzido (-22 dBFS RMS).
+serenidade.ogg = música original composta para o Fica Sóbrio (tool/compor_musica.py):
+lo-fi ambiente em Fá maior, 72 bpm, 16 compassos (53 s), piano elétrico, colchão de acordes,
+contrabaixo, sininhos e escovinha. Loop perfeito (a cauda da reverb volta para o início).
+Sem direitos de terceiros. Volume reduzido (-22 dBFS RMS).
 
-Para trocar: substitua calma.ogg (ou adicione outro .ogg/.mp3; o primeiro em ordem
-alfabética é o que toca). Não precisa mexer no código.
+Para trocar: substitua o arquivo (ou adicione outro .ogg/.mp3; o primeiro em ordem
+alfabética é o que toca). Para gerar uma variação: python3 tool/compor_musica.py saida.raw

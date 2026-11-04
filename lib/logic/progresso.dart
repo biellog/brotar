@@ -118,3 +118,48 @@ String fraseDoDia() {
   final diaDoAno = agora.difference(DateTime(agora.year)).inDays;
   return frases[diaDoAno % frases.length];
 }
+
+// ---------------- Painel "quanto o vício custa" ----------------
+const diasPorMes = 30.4375; // média (365,25 / 12)
+
+class Projecao {
+  final String rotulo;
+  final int meses;
+  final double total;
+  const Projecao(this.rotulo, this.meses, this.total);
+}
+
+/// Quanto se gasta (ou se economiza, parando) em cada período.
+List<Projecao> projecoesGasto(double mensal) => [
+      for (final (rotulo, meses) in const [
+        ('1 mês', 1),
+        ('5 meses', 5),
+        ('1 ano', 12),
+        ('5 anos', 60),
+        ('10 anos', 120),
+      ])
+        Projecao(rotulo, meses, mensal * meses),
+    ];
+
+/// Guardando [mensal] todo mês com rendimento de [taxa] ao mês (juros compostos).
+double comRendimento(double mensal, int meses, {double taxa = 0.006}) =>
+    taxa == 0 ? mensal * meses : mensal * ((pow(1 + taxa, meses) - 1) / taxa);
+
+const _sonhos = [
+  (150.0, 'um tênis novo 👟'),
+  (600.0, 'um fim de semana na praia 🏖️'),
+  (2000.0, 'um celular novo 📱'),
+  (5000.0, 'uma viagem de avião ✈️'),
+  (15000.0, 'uma moto 🏍️'),
+  (45000.0, 'um carro 🚗'),
+  (120000.0, 'a entrada de uma casa 🏠'),
+];
+
+/// O maior "sonho" que cabe no valor (ou null se não cabe nenhum).
+String? oQueDaPraComprar(double valor) {
+  String? melhor;
+  for (final (preco, sonho) in _sonhos) {
+    if (valor >= preco) melhor = sonho;
+  }
+  return melhor;
+}

@@ -10,7 +10,9 @@ enum Efeito {
   erro('sons/erro.ogg'), // Desvia da Tempestade: bateu numa tempestade
   carta('sons/carta.ogg'), // Memória Zen: virou uma carta
   bolhaCerta('sons/bolha_certa.ogg'), // Bolhas da Calma: bolha boa
-  bolhaErrada('sons/bolha_errada.ogg'); // Bolhas da Calma: nuvem
+  bolhaErrada('sons/bolha_errada.ogg'), // Bolhas da Calma: nuvem
+  plastico('sons/plastico.ogg'), // Plástico Bolha: estourou
+  plantar('sons/plantar.ogg'); // Jardim Mágico: plantou
 
   final String arquivo;
   const Efeito(this.arquivo);

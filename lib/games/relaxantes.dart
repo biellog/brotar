@@ -105,7 +105,7 @@ class _PlasticoBolhaScreenState extends State<PlasticoBolhaScreen> {
 
   void _toque(Offset p, Size s) {
     if (_m.tocar(p.dx / s.width, p.dy / s.height)) {
-      Musica.efeito(Efeito.bolhaCerta);
+      Musica.efeito(Efeito.plastico);
       HapticFeedback.selectionClick();
       setState(() {});
       if (_m.folhaCompleta) {
@@ -175,139 +175,6 @@ class _PintorPlastico extends CustomPainter {
             ).createShader(Rect.fromCircle(center: ctr, radius: r)),
         );
       }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => true;
-}
-
-// =====================================================================
-// 🌷 Jardim Zen
-// =====================================================================
-class _Planta {
-  final Offset pos; // proporcional
-  final String emoji;
-  final double nasceu, fase, tamanho;
-  _Planta(this.pos, this.emoji, this.nasceu, this.fase, this.tamanho);
-}
-
-class JardimZenScreen extends StatefulWidget {
-  const JardimZenScreen({super.key});
-
-  @override
-  State<JardimZenScreen> createState() => _JardimZenScreenState();
-}
-
-class _JardimZenScreenState extends State<JardimZenScreen> with SingleTickerProviderStateMixin {
-  static const _flores = ['🌷', '🌻', '🌼', '🌸', '🌹', '🌺', '🌿', '🍀', '🌳', '🍄'];
-  final _rnd = Random();
-  final _plantas = <_Planta>[];
-  final _pintor = PintorEmoji();
-  late final Ticker _ticker;
-  double _t = 0;
-  int _plantadas = 0;
-  var _inicio = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = createTicker((d) => setState(() => _t = d.inMicroseconds / 1e6))..start();
-    Repo.log('jogo_iniciado', {'jogo': 'jardim'});
-  }
-
-  @override
-  void dispose() {
-    _ticker.dispose();
-    super.dispose();
-  }
-
-  void _plantar(Offset p, Size s) {
-    final y = p.dy / s.height;
-    if (y < 0.35) return; // só na terra
-    Musica.efeito(Efeito.carta);
-    HapticFeedback.lightImpact();
-    _plantas.add(_Planta(Offset(p.dx / s.width, y), _flores[_rnd.nextInt(_flores.length)], _t,
-        _rnd.nextDouble() * pi * 2, 0.8 + _rnd.nextDouble() * 0.6));
-    _plantas.sort((a, b) => a.pos.dy.compareTo(b.pos.dy)); // de trás para frente
-    if (_plantas.length > 60) _plantas.removeAt(0);
-    _plantadas++;
-  }
-
-  @override
-  Widget build(BuildContext context) => _TelaRelaxante(
-        titulo: 'Jardim Zen',
-        contador: '🌱 $_plantadas  ',
-        fundo: const Color(0xFF0E2A20),
-        aoTerminar: () => _terminar(context, 'jardim', 'Jardim Zen', _plantadas * 5, _inicio,
-            'Você plantou $_plantadas plantas. Cuidar de algo também é cuidar de si. 🌷',
-            () => setState(() {
-                  _plantas.clear();
-                  _plantadas = 0;
-                  _inicio = DateTime.now();
-                })),
-        corpo: LayoutBuilder(builder: (_, box) {
-          final s = Size(box.maxWidth, box.maxHeight);
-          return GestureDetector(
-            onTapDown: (d) => _plantar(d.localPosition, s),
-            child: CustomPaint(size: s, painter: _PintorJardim(_plantas, _t, _pintor)),
-          );
-        }),
-      );
-}
-
-class _PintorJardim extends CustomPainter {
-  final List<_Planta> plantas;
-  final double t;
-  final PintorEmoji pintor;
-  _PintorJardim(this.plantas, this.t, this.pintor);
-
-  @override
-  void paint(Canvas c, Size s) {
-    // céu e terra
-    c.drawRect(Offset.zero & s,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF7EC8E3), Color(0xFFBDE3D1)],
-          ).createShader(Offset.zero & s));
-    final chao = Rect.fromLTWH(0, s.height * 0.33, s.width, s.height * 0.67);
-    c.drawRect(chao,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF5FAF5A), Color(0xFF2F7A3B)],
-          ).createShader(chao));
-    pintor.desenhar(c, '☀️', 48, Offset(s.width * 0.82, s.height * 0.1));
-    pintor.desenhar(c, '☁️', 44, Offset((s.width * 0.2 + t * 8) % (s.width + 80) - 40, s.height * 0.12));
-    // borboletas passeando
-    for (var i = 0; i < 2; i++) {
-      final bx = s.width * (0.5 + 0.38 * sin(t * 0.35 + i * 2.1));
-      final by = s.height * (0.42 + 0.12 * sin(t * 0.9 + i * 3));
-      pintor.desenhar(c, '🦋', 26, Offset(bx, by));
-    }
-    if (plantas.isEmpty) {
-      final tp = TextPainter(
-        text: const TextSpan(
-            text: 'Toque na grama para plantar 🌱', style: TextStyle(color: Colors.white, fontSize: 18)),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(c, Offset((s.width - tp.width) / 2, s.height * 0.6));
-    }
-    for (final p in plantas) {
-      final idade = ((t - p.nasceu) / 1.5).clamp(0.0, 1.0);
-      final escala = Curves.easeOutBack.transform(idade);
-      if (escala <= 0.01) continue;
-      final base = Offset(p.pos.dx * s.width, p.pos.dy * s.height);
-      final tam = 26 + 26 * p.pos.dy * p.tamanho; // mais perto = maior
-      c.save();
-      c.translate(base.dx, base.dy);
-      c.rotate(sin(t * 1.2 + p.fase) * 0.06);
-      c.scale(escala);
-      pintor.desenhar(c, p.emoji, tam, Offset(0, -tam * 0.45));
-      c.restore();
     }
   }
 
