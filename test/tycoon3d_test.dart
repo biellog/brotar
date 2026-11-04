@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:fica_sobrio/games/tycoon3d/mundo.dart';
 import 'package:fica_sobrio/games/tycoon3d/render.dart';
 import 'package:fica_sobrio/games/tycoon3d/tycoon3d_screen.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Anda com o jogador até (x, y), como se fosse o joystick.
