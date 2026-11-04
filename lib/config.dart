@@ -9,3 +9,13 @@ const linkDownload = String.fromEnvironment(
   'LINK_DOWNLOAD',
   defaultValue: 'https://biellog.github.io/fica-sobrio/',
 );
+
+/// Endereço do site (GitHub Pages) e links de convite.
+const siteUrl = 'https://biellog.github.io/fica-sobrio/';
+const pacoteAndroid = 'br.com.ficasobrio.fica_sobrio';
+
+/// Página do jogo online no navegador, já na sala certa.
+String linkSalaBrilha(String sala) => '${siteUrl}jogar/?sala=${Uri.encodeComponent(sala)}';
+
+/// Página do código de convite (mostra o código com botão de copiar).
+String linkConvite(String codigo) => '${siteUrl}convite.html?c=${Uri.encodeComponent(codigo)}';

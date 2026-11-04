@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../config.dart';
 import '../data/repo.dart';
 import '../logic/progresso.dart';
+import 'compartilhar.dart';
 
 const _lado = 1080.0;
 
@@ -133,8 +134,7 @@ Future<void> compartilharConquistaDeTempo({
   final mensagem = conquistaTitulo != null
       ? 'Desbloqueei "$conquistaTitulo" ${conquistaEmoji ?? ''} no Fica Sóbrio: estou sóbrio há $n $unidade! 💪'
       : 'Estou sóbrio há $n $unidade${economia >= 1 ? ' e já economizei ${dinheiro(economia)}' : ''}! 💪';
-  final convite = (codigoConvite == null || codigoConvite.isEmpty) ? '' : '\nUse meu código $codigoConvite e ganhe +100 XP.';
-  final texto = '$mensagem\n\n#FicaSobrio — $appSlogan$convite\nBaixe grátis: $linkDownload';
+  final texto = '$mensagem\n\n#FicaSobrio — $appSlogan${blocoConvite(codigoConvite)}\n\nBaixe grátis: $linkDownload';
   await Repo.log('compartilhou', {'origem': origem, 'imagem': true});
   try {
     if (kIsWeb) throw UnsupportedError('web');

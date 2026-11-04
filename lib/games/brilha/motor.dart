@@ -174,7 +174,10 @@ class MotorBrilha {
     }
     var k = 0;
     while (jogadores.values.where((j) => j.bot).length < precisa && k < 40) {
-      final n = _rnd.nextInt(_nomesBots.length);
+      // nome que ainda não está na sala (sem dois "Duda" ao mesmo tempo)
+      final usados = jogadores.values.map((j) => j.nome.split(' ').first).toSet();
+      final livres = [for (var i = 0; i < _nomesBots.length; i++) if (!usados.contains(_nomesBots[i])) i];
+      final n = livres.isEmpty ? _rnd.nextInt(_nomesBots.length) : livres[_rnd.nextInt(livres.length)];
       final id = 'bot-$n-${_rnd.nextInt(9999)}';
       entrar(id, '${_nomesBots[n]} ${_sobrenomesBots[_rnd.nextInt(_sobrenomesBots.length)]}',
           coresVagalume[_rnd.nextInt(coresVagalume.length)], bot: true);

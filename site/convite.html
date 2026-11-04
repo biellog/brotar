@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convite · Fica Sóbrio</title>
+<meta name="description" content="Você recebeu um convite para o Fica Sóbrio. Use o código e ganhe +100 XP.">
+<meta property="og:title" content="🎁 Você ganhou um convite para o Fica Sóbrio">
+<meta property="og:description" content="Use o código e ganhe +100 XP no app que transforma ficar sóbrio num jogo.">
+<meta property="og:image" content="https://biellog.github.io/fica-sobrio/img/compartilhar.png">
+<link rel="icon" type="image/png" href="img/icone.png">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#07140F;--card:#10261D;--verde:#1FAF7A;--ouro:#FFC23D;--texto:#EAF5EF;--suave:#A7C1B5}
+*{box-sizing:border-box;margin:0}
+body{font-family:Nunito,system-ui,sans-serif;background:radial-gradient(circle at 50% 0%,#15724F,var(--fundo) 60%);color:var(--texto);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.cartao{width:100%;max-width:420px;background:rgba(16,38,29,.92);border:1px solid rgba(255,255,255,.08);border-radius:28px;padding:28px 22px;text-align:center;box-shadow:0 30px 60px rgba(0,0,0,.4)}
+.logo{width:72px;height:72px;border-radius:18px;margin:0 auto 10px;display:block}
+h1{font-size:24px;font-weight:900;margin-bottom:6px}
+p{color:var(--suave);line-height:1.5}
+.codigo{margin:22px 0 10px;font-size:46px;font-weight:900;letter-spacing:8px;color:var(--ouro);background:rgba(0,0,0,.3);border:2px dashed rgba(255,194,61,.6);border-radius:18px;padding:14px 6px;user-select:all;-webkit-user-select:all}
+.btn{display:block;width:100%;border:0;border-radius:16px;padding:16px;font:900 17px Nunito,sans-serif;cursor:pointer;text-decoration:none;margin-top:10px}
+.ouro{background:linear-gradient(90deg,#FFE08A,var(--ouro),#FF9F1C);color:#1d1400}
+.verde{background:var(--verde);color:#03140d}
+.linha{background:transparent;color:var(--texto);border:2px solid rgba(255,255,255,.15)}
+.ok{color:#7BD389;font-weight:800;min-height:22px;margin-top:6px}
+.passos{text-align:left;margin-top:18px;font-size:14px}
+.passos li{margin:6px 0 6px 18px;color:var(--suave)}
+.erro{color:#FF8A8A}
+</style>
+</head>
+<body>
+<main class="cartao">
+  <img class="logo" src="img/icone.png" alt="">
+  <h1>🎁 Você ganhou um convite!</h1>
+  <p>Use este código no <b>Fica Sóbrio</b> e ganhe <b>+100 XP</b>. Quem te convidou ganha também.</p>
+  <div class="codigo" id="codigo">······</div>
+  <button class="btn ouro" id="copiar">📋 Copiar código</button>
+  <div class="ok" id="ok"></div>
+  <a class="btn verde" id="abrir" href="#">📱 Abrir no aplicativo</a>
+  <a class="btn linha" href="https://github.com/biellog/fica-sobrio/releases/latest/download/FicaSobrio.apk">⬇️ Ainda não tenho: baixar grátis</a>
+  <ol class="passos">
+    <li>Instale e abra o app.</li>
+    <li>No cadastro, cole o código no campo <b>"código de convite"</b>.</li>
+    <li>Já tem conta? Vá em <b>Perfil → Tenho um código de convite</b>.</li>
+  </ol>
+</main>
+<script>
+(function(){
+  var c = (new URLSearchParams(location.search).get('c') || '').trim().toUpperCase();
+  var valido = /^[A-Z0-9]{4,12}$/.test(c);
+  var el = document.getElementById('codigo'), ok = document.getElementById('ok');
+  if (!valido) { el.textContent = '?'; ok.className = 'ok erro'; ok.textContent = 'Link de convite incompleto. Peça o código para quem te convidou.'; }
+  else el.textContent = c;
+  document.getElementById('copiar').onclick = function(){
+    if (!valido) return;
+    function feito(){ ok.className='ok'; ok.textContent = '✅ Código copiado! Agora é só colar no app.'; }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(c).then(feito, selecionar);
+    else selecionar();
+    function selecionar(){ var r=document.createRange(); r.selectNodeContents(el); var s=getSelection(); s.removeAllRanges(); s.addRange(r); try{document.execCommand('copy'); feito();}catch(e){ ok.textContent='Segure o código para copiar.'; } }
+  };
+  var android = /Android/i.test(navigator.userAgent);
+  var abrir = document.getElementById('abrir');
+  if (!valido || !android) { abrir.style.display = 'none'; }
+  else {
+    // abre o app se estiver instalado; senão, cai no site
+    abrir.href = 'intent://convite?c=' + encodeURIComponent(c) +
+      '#Intent;scheme=ficasobrio;package=br.com.ficasobrio.fica_sobrio;S.browser_fallback_url=' +
+      encodeURIComponent('https://biellog.github.io/fica-sobrio/') + ';end';
+  }
+})();
+</script>
+</body>
+</html>

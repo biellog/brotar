@@ -33,6 +33,34 @@ class JogadorRede {
   }
 }
 
+/// Uma sala aberta, para a lista "Achar partidas".
+class SalaInfo {
+  final String codigo;
+  final int pessoas;
+  final List<String> nomes;
+  const SalaInfo(this.codigo, this.pessoas, this.nomes);
+
+  bool get geral => codigo == 'geral';
+}
+
+final _codigoSala = RegExp(r'^[A-Z0-9]{4,8}$');
+
+/// Junta os avisos de presença do diretório em uma lista de salas públicas.
+/// A Arena Geral sempre aparece primeiro; as outras, da mais cheia para a mais vazia.
+List<SalaInfo> agruparSalas(Iterable<Map<String, dynamic>> presencas) {
+  final porSala = <String, List<String>>{};
+  for (final p in presencas) {
+    final sala = p['s'];
+    if (sala is! String || p['pub'] != true) continue;
+    if (sala != 'geral' && !_codigoSala.hasMatch(sala)) continue;
+    porSala.putIfAbsent(sala, () => []).add(limparNome(p['n']));
+  }
+  porSala.putIfAbsent('geral', () => []);
+  final lista = [for (final e in porSala.entries) SalaInfo(e.key, e.value.length, e.value)];
+  lista.sort((a, b) => a.geral ? -1 : (b.geral ? 1 : b.pessoas.compareTo(a.pessoas)));
+  return lista.take(30).toList();
+}
+
 String limparNome(Object? n) {
   if (n is! String) return 'Vagalume';
   final limpo = n.replaceAll(RegExp(r'[\u0000-\u001F<>]'), '').trim();
@@ -44,6 +72,7 @@ String limparNome(Object? n) {
 /// Sem internet ou sem Supabase, o jogo roda só com bots (modo offline).
 class RedeBrilha {
   RealtimeChannel? _canal;
+  RealtimeChannel? _diretorio;
   bool conectado = false;
   final _presentes = <String, (String, int)>{}; // id -> (nome, cor)
 
@@ -64,6 +93,7 @@ class RedeBrilha {
     required String meuId,
     required String meuNome,
     required int minhaCor,
+    bool publica = true,
     required void Function(List<JogadorRede>) aoReceberPosicoes,
     required void Function(int luz, int geracao) aoReceberLuz,
     required void Function(String id, String emote) aoReceberEmote,
@@ -119,6 +149,14 @@ class RedeBrilha {
           conectado = true;
           aoMudarConexao(true);
           await canal.track({'i': meuId, 'n': meuNome, 'c': minhaCor});
+          // aparece em "Achar partidas" (salas privadas não são listadas)
+          final dir = db.channel(canalDiretorio, opts: RealtimeChannelConfig(key: meuId));
+          _diretorio = dir;
+          dir.subscribe((st, _) async {
+            if (st == RealtimeSubscribeStatus.subscribed) {
+              await dir.track({'s': sala, 'pub': publica, 'n': meuNome});
+            }
+          });
         } else if (status == RealtimeSubscribeStatus.closed ||
             status == RealtimeSubscribeStatus.channelError ||
             status == RealtimeSubscribeStatus.timedOut) {
@@ -160,8 +198,16 @@ class RedeBrilha {
 
   Future<void> sair() async {
     final c = _canal;
+    final d = _diretorio;
     _canal = null;
+    _diretorio = null;
     conectado = false;
+    if (d != null) {
+      try {
+        await d.untrack();
+        await _db?.removeChannel(d);
+      } catch (_) {}
+    }
     if (c == null) return;
     try {
       await c.untrack();
@@ -169,20 +215,22 @@ class RedeBrilha {
     } catch (_) {}
   }
 
-  /// Conta quantas pessoas estão na Arena Geral agora (para o lobby).
-  static Future<(RealtimeChannel?, void Function())> observarOnline(void Function(int) aoContar) async {
+  static const canalDiretorio = 'brilha-diretorio';
+
+  /// Acompanha, ao vivo, as salas abertas (para "Achar partidas" e o contador do saguão).
+  static Future<void Function()> observarSalas(void Function(List<SalaInfo> salas, int totalOnline) aoMudar) async {
     final db = _db;
-    if (db == null) return (null, () {});
-    final canal = db.channel(nomeCanal('geral'));
+    if (db == null) {
+      aoMudar(agruparSalas(const []), 0);
+      return () {};
+    }
+    final canal = db.channel(canalDiretorio);
     canal
       ..onPresenceSync((_) {
-        var n = 0;
-        for (final e in canal.presenceState()) {
-          n += e.presences.length;
-        }
-        aoContar(n);
+        final todas = [for (final e in canal.presenceState()) for (final p in e.presences) p.payload];
+        aoMudar(agruparSalas(todas), todas.length);
       })
       ..subscribe();
-    return (canal, () => db.removeChannel(canal));
+    return () => db.removeChannel(canal);
   }
 }

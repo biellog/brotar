@@ -186,4 +186,12 @@ void main() {
     final melhorBot = m.jogadores.values.where((j) => j.bot).map((j) => j.pontos).reduce(max);
     expect(melhorBot, lessThan(150)); // antes passava de 800
   });
+
+  test('bots não repetem nome na mesma sala', () {
+    final m = MotorBrilha('geral', Random(4))..sincronizarRodada(agora);
+    m.entrar('eu', 'Eu', coresVagalume[0], eu: true);
+    m.ajustarBots(8);
+    final nomes = m.jogadores.values.where((j) => j.bot).map((j) => j.nome.split(' ').first).toList();
+    expect(nomes.toSet().length, nomes.length);
+  });
 }

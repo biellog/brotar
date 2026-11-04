@@ -41,7 +41,13 @@ String gerarCodigoSala([Random? r]) {
 bool codigoValido(String c) => RegExp(r'^[A-Z0-9]{4,8}$').hasMatch(c);
 
 class BrilhaScreen extends StatefulWidget {
-  const BrilhaScreen({super.key});
+  /// Sala para entrar direto (veio de um link de convite).
+  final String? salaInicial;
+
+  /// Versão do navegador: sem conta, então não soma XP (convida a baixar o app).
+  final bool web;
+  final String? nomeInicial;
+  const BrilhaScreen({super.key, this.salaInicial, this.web = false, this.nomeInicial});
 
   @override
   State<BrilhaScreen> createState() => _BrilhaScreenState();
@@ -56,7 +62,10 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
 
   // saguão
   int _onlineGeral = 0;
+  List<SalaInfo> _salas = const [];
+  final _salasNotifier = ValueNotifier<List<SalaInfo>>(const []);
   void Function()? _pararContagem;
+  bool _salaPublica = true;
 
   // jogo
   MotorBrilha? _m;
@@ -79,11 +88,24 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
     super.initState();
     _ticker = createTicker(_tick)..start();
     _minhaCor = coresVagalume[_rnd.nextInt(coresVagalume.length)];
-    _carregarNome();
-    RedeBrilha.observarOnline((n) {
-      if (mounted) setState(() => _onlineGeral = n);
-    }).then((r) => _pararContagem = r.$2);
+    if (widget.nomeInicial != null) _meuNome = limparNome(widget.nomeInicial);
+    if (!widget.web) _carregarNome();
+    _observarSalas();
     Repo.log('jogo_iniciado', {'jogo': 'brilha'});
+    final sala = widget.salaInicial;
+    if (sala != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _jogar(sala, publica: false);
+      });
+    }
+  }
+
+  void _observarSalas() {
+    RedeBrilha.observarSalas((salas, total) {
+      _salas = salas;
+      _salasNotifier.value = salas;
+      if (mounted) setState(() => _onlineGeral = total);
+    }).then((parar) => _pararContagem = parar);
   }
 
   Future<void> _carregarNome() async {
@@ -99,11 +121,13 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
     _ticker.dispose();
     _pararContagem?.call();
     _rede?.sair();
+    _salasNotifier.dispose();
     super.dispose();
   }
 
   // ======================= entrar / sair =======================
-  Future<void> _jogar(String sala) async {
+  Future<void> _jogar(String sala, {bool publica = true}) async {
+    _salaPublica = sala == 'geral' || publica;
     Musica.efeito(Efeito.brRodada);
     HapticFeedback.mediumImpact();
     _pararContagem?.call();
@@ -125,6 +149,7 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
       meuId: _meuId,
       meuNome: _meuNome,
       minhaCor: _minhaCor,
+      publica: _salaPublica,
       aoReceberPosicoes: (lista) {
         for (final j in lista) {
           if (j.id == _meuId) continue;
@@ -147,9 +172,7 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
       _rede = null;
       _online = false;
     });
-    RedeBrilha.observarOnline((n) {
-      if (mounted) setState(() => _onlineGeral = n);
-    }).then((r) => _pararContagem = r.$2);
+    _observarSalas();
   }
 
   // ======================= loop =======================
@@ -236,6 +259,10 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
     if (eu == null || !_jogou) return;
     Musica.efeito(Efeito.tyFilial);
     HapticFeedback.heavyImpact();
+    if (widget.web || Repo.uid == null) {
+      if (mounted) setState(() => _ganhoXp = -1); // navegador: convida a baixar o app
+      return;
+    }
     final xp = 10 + min<int>(50, eu.pontos ~/ 3);
     try {
       final antes = ((await Repo.perfil())?['xp'] as num?)?.toInt() ?? 0;
@@ -269,21 +296,88 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
   }
 
   Future<void> _criarSala() async {
+    final publica = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1B1446),
+        title: const Text('👥 Nova sala'),
+        content: const Text('Quem pode entrar na sua sala?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('🔒 Só com código')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('🌍 Pública')),
+        ],
+      ),
+    );
+    if (publica == null) return;
     final codigo = gerarCodigoSala(_rnd);
+    await _jogar(codigo, publica: publica);
     await _convidar(codigo);
-    _jogar(codigo);
   }
+
+  static String mensagemConvite(String codigo) => BrilhaScreenMensagens.convite(codigo);
 
   Future<void> _convidar(String codigo) async {
     Repo.log('compartilhou', {'origem': 'brilha_sala'});
     try {
-      await Share.share(
-        '🌟 Vem brilhar comigo no Brilha Junto, o jogo online do Fica Sóbrio!\n'
-        'Abra o app → Jogos → Brilha Junto → "Entrar com código" e digite: $codigo\n\n'
-        'Juntos a gente brilha mais. 💚 Baixe grátis: $linkDownload',
-        subject: 'Brilha Junto',
-      );
+      await Share.share(mensagemConvite(codigo), subject: 'Brilha Junto');
     } catch (_) {}
+  }
+
+  void _copiarCodigo(String codigo) {
+    Clipboard.setData(ClipboardData(text: codigo));
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Código $codigo copiado!')));
+  }
+
+  void _acharPartidas() {
+    Repo.log('tela', {'nome': 'brilha_achar_partidas'});
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF151036),
+      showDragHandle: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        builder: (_, rolagem) => ValueListenableBuilder<List<SalaInfo>>(
+          valueListenable: _salasNotifier,
+          builder: (_, salas, _) => ListView(
+            controller: rolagem,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            children: [
+              const Text('🔎 Achar partidas', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+              const Text('Salas abertas agora. A lista se atualiza sozinha.',
+                  style: TextStyle(color: Colors.white60)),
+              const SizedBox(height: 12),
+              for (final sala in salas)
+                _CartaoSala(
+                  sala: sala,
+                  aoEntrar: () {
+                    Navigator.pop(ctx);
+                    _jogar(sala.codigo);
+                  },
+                ),
+              if (salas.length <= 1)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Nenhuma sala pública além da Arena Geral agora.\nCrie a sua e chame os amigos! 👥',
+                      textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
+                ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _criarSala();
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Criar minha sala'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _entrarComCodigo() async {
@@ -314,7 +408,7 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
       }
       return;
     }
-    _jogar(codigo);
+    _jogar(codigo, publica: false);
   }
 
   // ======================= interface =======================
@@ -408,6 +502,14 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
                     ),
                   ),
                 ]),
+                const SizedBox(height: 10),
+                _BotaoGrande(
+                  texto: '🔎 Achar partidas',
+                  sub: '${_salas.length} ${_salas.length == 1 ? 'sala aberta' : 'salas abertas'} agora',
+                  cores: const [Color(0xFF06D6A0), Color(0xFF118AB2)],
+                  aoTocar: _acharPartidas,
+                  claro: false,
+                ),
                 const SizedBox(height: 12),
                 const Text(
                   'Quando tem pouca gente, vagalumes 🤖 (bots) completam a sala para ela não ficar vazia.',
@@ -492,11 +594,20 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
                 const SizedBox(width: 8),
                 Text(
                   _online
-                      ? '🟢 $reais ${reais == 1 ? 'pessoa' : 'pessoas'}${bots > 0 ? ' · 🤖 $bots' : ''}${_sala == 'geral' ? '' : '  ·  sala $_sala'}'
+                      ? '🟢 $reais ${reais == 1 ? 'pessoa' : 'pessoas'}${bots > 0 ? ' · 🤖 $bots' : ''}${_sala == 'geral' ? '' : '  ·  ${_salaPublica ? '🌍' : '🔒'} sala'}'
                       : '⚪ offline · só com vagalumes 🤖',
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 if (_sala != 'geral') ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => _copiarCodigo(_sala),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(8)),
+                      child: Text('📋 $_sala', style: const TextStyle(color: _ouro, fontSize: 12, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
                   const SizedBox(width: 6),
                   GestureDetector(
                     onTap: () => _convidar(_sala),
@@ -621,7 +732,9 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
           Text(
             !_jogou
                 ? 'Mexa-se na próxima rodada para ganhar XP!'
-                : _ganhoXp == null
+                : _ganhoXp == -1
+                    ? '📱 Baixe o app Fica Sóbrio para ganhar XP e conquistas!'
+                    : _ganhoXp == null
                     ? 'Somando seu XP...'
                     : _ganhoXp! > 0
                         ? 'Todo mundo ganha! Você ganhou +$_ganhoXp XP 💚'
@@ -679,6 +792,61 @@ class _BrilhaScreenState extends State<BrilhaScreen> with SingleTickerProviderSt
           ),
         ]),
       );
+}
+
+/// Mensagem de convite: o código vem sozinho numa linha (fácil de copiar)
+/// e o link abre a sala no app ou no navegador.
+class BrilhaScreenMensagens {
+  static String convite(String codigo) =>
+      '🌟 Vem brilhar comigo no Brilha Junto, o jogo online do Fica Sóbrio!\n\n'
+      '👉 Toque para entrar na minha sala (no app ou no navegador):\n'
+      '${linkSalaBrilha(codigo)}\n\n'
+      'Ou use o código da sala:\n'
+      '$codigo\n\n'
+      'Juntos a gente brilha mais. 💚';
+}
+
+class _CartaoSala extends StatelessWidget {
+  final SalaInfo sala;
+  final VoidCallback aoEntrar;
+  const _CartaoSala({required this.sala, required this.aoEntrar});
+
+  @override
+  Widget build(BuildContext context) {
+    final nomes = sala.nomes.take(3).join(', ') + (sala.nomes.length > 3 ? ' +${sala.nomes.length - 3}' : '');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: sala.geral
+              ? const [Color(0xFF3A2C8F), Color(0xFF1B1446)]
+              : const [Color(0xFF1F2A5C), Color(0xFF151036)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: sala.geral ? _ouro.withValues(alpha: 0.6) : Colors.white12),
+      ),
+      child: Row(children: [
+        Text(sala.geral ? '🌍' : '👥', style: const TextStyle(fontSize: 30)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(sala.geral ? 'Arena Geral' : 'Sala ${sala.codigo}',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            Text(
+              sala.pessoas == 0
+                  ? 'Vazia agora: os bots 🤖 te esperam!'
+                  : '🟢 ${sala.pessoas} ${sala.pessoas == 1 ? 'pessoa' : 'pessoas'}  ·  $nomes',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ]),
+        ),
+        FilledButton(onPressed: aoEntrar, child: const Text('Entrar')),
+      ]),
+    );
+  }
 }
 
 class _Pilula extends StatelessWidget {

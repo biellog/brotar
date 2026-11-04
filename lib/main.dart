@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
+import 'data/links.dart';
 import 'data/musica.dart';
 import 'data/repo.dart';
 import 'screens/auth_screen.dart';
@@ -15,6 +16,7 @@ Future<void> main() async {
     await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
   }
   await Musica.iniciar();
+  await LinksApp.iniciar(); // links ficasobrio:// (convites e salas do Brilha Junto)
   runApp(const FicaSobrioApp());
 }
 

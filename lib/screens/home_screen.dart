@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/atualizacao.dart';
 import '../data/instalador.dart';
+import '../data/links.dart';
 import '../data/notificacoes.dart';
 import '../data/repo.dart';
 import '../logic/progresso.dart';
@@ -32,7 +33,62 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarAtualizacoes());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _iniciarAtualizacoes();
+      _abrirSalaPendente();
+      _usarConvitePendente();
+    });
+    LinksApp.salaPendente.addListener(_abrirSalaPendente);
+    LinksApp.convitePendente.addListener(_usarConvitePendente);
+  }
+
+  @override
+  void dispose() {
+    LinksApp.salaPendente.removeListener(_abrirSalaPendente);
+    LinksApp.convitePendente.removeListener(_usarConvitePendente);
+    super.dispose();
+  }
+
+  /// Link de convite para o Brilha Junto: abre o jogo direto na sala.
+  void _abrirSalaPendente() {
+    final sala = LinksApp.salaPendente.value;
+    if (sala == null || !mounted) return;
+    LinksApp.salaPendente.value = null;
+    Repo.log('link_aberto', {'tipo': 'brilha'});
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => BrilhaScreen(salaInicial: sala),
+    ));
+  }
+
+  /// Link de código de convite: pergunta se quer usar (+100 XP).
+  Future<void> _usarConvitePendente() async {
+    final codigo = LinksApp.convitePendente.value;
+    if (codigo == null || !mounted) return;
+    LinksApp.convitePendente.value = null;
+    final perfil = await Repo.perfil();
+    if (!mounted) return;
+    if (perfil?['convidado_por'] != null || perfil?['codigo_convite'] == codigo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Você já usou um código de convite (ou esse código é o seu).')));
+      return;
+    }
+    final usar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🤝 Código de convite'),
+        content: Text('Usar o código $codigo? Você ganha +100 XP e quem te convidou também ganha.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Agora não')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Usar código')),
+        ],
+      ),
+    );
+    if (usar != true || !mounted) return;
+    final ok = await Repo.usarConvite(codigo);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? 'Convite aceito! +100 XP 🎉' : 'Código inválido ou já usado.')));
   }
 
   Future<void> _iniciarAtualizacoes() async {

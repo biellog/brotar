@@ -4,7 +4,7 @@ name: 🌐 Publicar site
 on:
   push:
     branches: [main]
-    paths: ['site/**', '.github/workflows/site.yml']
+    paths: ['site/**', 'lib/**', 'web/**', 'assets/**', 'pubspec.*', '.github/workflows/site.yml']
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,26 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # Jogo Brilha Junto para navegador -> site/jogar/
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+      - name: Compilar o Brilha Junto (web)
+        env:
+          URL_BRUTA: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          CHAVE: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+        run: |
+          URL=$(echo "$URL_BRUTA" | sed -E 's#^(https://[^/]+).*#\1#')
+          flutter pub get
+          flutter build web -t lib/web_brilha.dart --release \
+            --base-href "/${{ github.event.repository.name }}/jogar/" \
+            --dart-define=SUPABASE_URL="$URL" --dart-define=SUPABASE_ANON_KEY="$CHAVE" \
+            --dart-define=LINK_DOWNLOAD=https://biellog.github.io/fica-sobrio/
+          rm -rf site/jogar && cp -r build/web site/jogar
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

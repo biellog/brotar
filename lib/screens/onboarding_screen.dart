@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/links.dart';
 import '../data/repo.dart';
 import '../theme.dart';
 
@@ -16,7 +17,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   DateTime _inicio = DateTime.now();
   final _gasto = TextEditingController();
   final _motivo = TextEditingController();
-  final _convite = TextEditingController();
+  late final _convite = TextEditingController(text: LinksApp.convitePendente.value ?? '');
   bool _salvando = false;
 
   @override
@@ -58,6 +59,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       });
       await Repo.somarXp(50, 'onboarding');
       if (_convite.text.trim().isNotEmpty) {
+        LinksApp.convitePendente.value = null;
         final ok = await Repo.usarConvite(_convite.text);
         messenger.showSnackBar(SnackBar(
           content: Text(ok ? 'Convite aceito! +100 XP pra você 🎉' : 'Código de convite inválido.'),
