@@ -6,20 +6,21 @@ import 'dart:math';
 class Produto {
   final String id, nome, emoji, gerente;
   final double custoBase, crescimento, receitaBase, tempoBase, custoGerente;
+  final int cor; // cor da fruta (ARGB), usada no visual
   const Produto(this.id, this.nome, this.emoji, this.custoBase, this.crescimento, this.receitaBase,
-      this.tempoBase, this.custoGerente, this.gerente);
+      this.tempoBase, this.custoGerente, this.gerente, this.cor);
 }
 
 /// Sucos da loja: cada um custa e rende mais, mas demora mais.
 const produtos = <Produto>[
-  Produto('limao', 'Limonada', '🍋', 4, 1.07, 1, 0.8, 1000, 'Dona Cida'),
-  Produto('laranja', 'Suco de Laranja', '🍊', 60, 1.15, 60, 3, 15000, 'Seu Zé'),
-  Produto('morango', 'Vitamina de Morango', '🍓', 720, 1.14, 540, 6, 100000, 'Júlia'),
-  Produto('coco', 'Água de Coco', '🥥', 8640, 1.13, 4320, 12, 500000, 'Marcão'),
-  Produto('manga', 'Suco de Manga', '🥭', 103680, 1.12, 51840, 24, 1.2e6, 'Tia Lu'),
-  Produto('uva', 'Suco de Uva', '🍇', 1.244e6, 1.11, 622080, 96, 1e7, 'Rafa'),
-  Produto('melancia', 'Suco de Melancia', '🍉', 1.493e7, 1.10, 7.465e6, 384, 1.11e8, 'Bia'),
-  Produto('abacaxi', 'Abacaxi com Hortelã', '🍍', 1.792e8, 1.09, 8.958e7, 1536, 5.55e8, 'Dr. Kiwi'),
+  Produto('limao', 'Limonada', '🍋', 4, 1.07, 1, 0.8, 1000, 'Dona Cida', 0xFFF4D03F),
+  Produto('laranja', 'Suco de Laranja', '🍊', 60, 1.15, 60, 3, 15000, 'Seu Zé', 0xFFFF8C1A),
+  Produto('morango', 'Vitamina de Morango', '🍓', 720, 1.14, 540, 6, 100000, 'Júlia', 0xFFFF4D6D),
+  Produto('coco', 'Água de Coco', '🥥', 8640, 1.13, 4320, 12, 500000, 'Marcão', 0xFFB08968),
+  Produto('manga', 'Suco de Manga', '🥭', 103680, 1.12, 51840, 24, 1.2e6, 'Tia Lu', 0xFFFFB627),
+  Produto('uva', 'Suco de Uva', '🍇', 1.244e6, 1.11, 622080, 96, 1e7, 'Rafa', 0xFF9D4EDD),
+  Produto('melancia', 'Suco de Melancia', '🍉', 1.493e7, 1.10, 7.465e6, 384, 1.11e8, 'Bia', 0xFF52B788),
+  Produto('abacaxi', 'Abacaxi com Hortelã', '🍍', 1.792e8, 1.09, 8.958e7, 1536, 5.55e8, 'Dr. Kiwi', 0xFFE9C46A),
 ];
 
 /// Níveis que dobram a velocidade do suco.
@@ -47,11 +48,60 @@ const melhorias = <Melhoria>[
   Melhoria('Franquia nacional', 'TODOS os sucos rendem 5x', -1, 5, 5e13),
 ];
 
+// ---------------- Missões ----------------
+enum TipoMissao { abrir, nivel, vender, gerente, vip, rush, filial, ganhar }
+
+class Missao {
+  final String texto;
+  final TipoMissao tipo;
+  final int produto;
+  final double alvo;
+  final int gemas;
+  final double minutosDeGanho; // recompensa em dinheiro: X minutos de faturamento
+  const Missao(this.texto, this.tipo, this.produto, this.alvo, this.gemas, this.minutosDeGanho);
+}
+
+/// Sequência de missões: sempre existe um próximo objetivo.
+final List<Missao> missoes = () {
+  final m = <Missao>[];
+  final vendas = [25, 60, 100, 150, 200, 300, 400, 500];
+  for (var i = 0; i < produtos.length; i++) {
+    final p = produtos[i];
+    if (i > 0) m.add(Missao('Abra ${p.nome}', TipoMissao.abrir, i, 1, 1, 2));
+    m.add(Missao('Venda ${vendas[i]} x ${p.nome}', TipoMissao.vender, i, vendas[i].toDouble(), 2, 3));
+    m.add(Missao('${p.nome} no nível 25', TipoMissao.nivel, i, 25, 2, 3));
+    m.add(Missao('Contrate ${p.gerente}', TipoMissao.gerente, i, 1, 3, 5));
+    if (i == 1) m.add(const Missao('Atenda 3 clientes VIP', TipoMissao.vip, 0, 3, 3, 5));
+    if (i == 2) m.add(const Missao('Atenda 40 clientes na Hora do Rush', TipoMissao.rush, 0, 40, 3, 5));
+    m.add(Missao('${p.nome} no nível 50', TipoMissao.nivel, i, 50, 3, 5));
+    if (i == 3) m.add(const Missao('Fature R\$ 1 milhão no total', TipoMissao.ganhar, 0, 1e6, 4, 5));
+    if (i == 4) m.add(const Missao('Atenda 10 clientes VIP', TipoMissao.vip, 0, 10, 4, 8));
+    if (i == 5) m.add(const Missao('Abra a sua 2ª filial', TipoMissao.filial, 0, 2, 6, 10));
+    m.add(Missao('${p.nome} no nível 100', TipoMissao.nivel, i, 100, 4, 8));
+  }
+  m.add(const Missao('Atenda 300 clientes na Hora do Rush', TipoMissao.rush, 0, 300, 8, 15));
+  m.add(const Missao('Fature R\$ 1 trilhão no total', TipoMissao.ganhar, 0, 1e12, 10, 15));
+  m.add(const Missao('Abra a sua 5ª filial', TipoMissao.filial, 0, 5, 15, 20));
+  for (var i = 0; i < produtos.length; i++) {
+    m.add(Missao('${produtos[i].nome} no nível 200', TipoMissao.nivel, i, 200, 5, 10));
+  }
+  return m;
+}();
+
+// ---------------- Turbos (pagos com gemas) ----------------
+enum Turbo { dobro, tempo, rush }
+
+const custoTurbo = {Turbo.dobro: 5, Turbo.tempo: 10, Turbo.rush: 3};
+
+/// Fachada da loja conforme o Nível do Império.
+const fachadas = ['Barraquinha', 'Quiosque', 'Lojinha', 'Loja Grande', 'Megaloja', 'Shopping do Suco'];
+
 class EstadoProduto {
   int nivel = 0;
   bool gerente = false;
   bool rodando = false;
   double progresso = 0;
+  int vendas = 0; // ciclos vendidos (missões)
 }
 
 /// Evento de um ciclo concluído (para som e animação "+R$").
@@ -64,15 +114,34 @@ class Venda {
 class MotorTycoon {
   final estados = List.generate(produtos.length, (_) => EstadoProduto());
   final compradas = <int>{}; // melhorias compradas
+  final missoesFeitas = <int>{};
   double dinheiro = 0;
   double ganhoDaFilial = 0; // nesta filial
   double ganhoDaVida = 0; // de todas as filiais (dá as estrelas)
   int estrelas = 0;
   int filiais = 1;
+  int gemas = 0;
+  int vipsAtendidos = 0;
+  int clientesRush = 0;
+  int nivelImperioPremiado = 1; // até qual nível do império já deu gemas
+  int ultimoBau = 0; // dia (desde 1970) do último baú aberto
+
+  // efeitos temporários (segundos restantes)
+  double turboDobro = 0;
+  double ondaCalor = 0;
+  double rush = 0;
+  double proximoRush = 150;
+  double proximoCalor = 240;
 
   // Cliente VIP
-  double vipEm = 25; // segundos até o próximo
-  double vipVisivel = 0; // > 0 enquanto está na loja
+  double vipEm = 25;
+  double vipVisivel = 0;
+
+  // combo da Hora do Rush
+  int combo = 0;
+  double _ultimoAtendimento = -10;
+  double _relogio = 0;
+
   final Random _rnd;
 
   MotorTycoon([Random? rnd]) : _rnd = rnd ?? Random() {
@@ -80,6 +149,7 @@ class MotorTycoon {
   }
 
   static const bonusPorEstrela = 0.05;
+  static const duracaoRush = 20.0;
 
   // ---------------- contas ----------------
   int marcosAtingidos(int i) => marcos.where((m) => estados[i].nivel >= m).length;
@@ -99,7 +169,12 @@ class MotorTycoon {
 
   double get multEstrelas => 1 + estrelas * bonusPorEstrela;
 
-  double receita(int i) => produtos[i].receitaBase * estados[i].nivel * multProduto(i) * multEstrelas;
+  /// Multiplicador dos efeitos temporários (turbo x2, onda de calor x3).
+  double get multTemporario => (turboDobro > 0 ? 2 : 1) * (ondaCalor > 0 ? 3 : 1);
+
+  double receitaBase(int i) => produtos[i].receitaBase * estados[i].nivel * multProduto(i) * multEstrelas;
+
+  double receita(int i) => receitaBase(i) * multTemporario;
 
   /// Custo de comprar [n] níveis do produto [i] (progressão geométrica).
   double custo(int i, int n) {
@@ -117,25 +192,41 @@ class MotorTycoon {
     final n = (log(dinheiro * (r - 1) / primeiro + 1) / log(r)).floor();
     var ok = min(n, 1000);
     while (ok > 0 && custo(i, ok) > dinheiro + 1e-6) {
-      ok--; // corrige arredondamento
+      ok--;
     }
     return ok;
   }
 
-  double get ganhoPorSegundo {
+  /// Faturamento por segundo SEM efeitos temporários (base para recompensas).
+  double get ganhoPorSegundoBase {
     var g = 0.0;
     for (var i = 0; i < produtos.length; i++) {
-      if (estados[i].nivel > 0 && estados[i].gerente) g += receita(i) / tempo(i);
+      if (estados[i].nivel > 0 && estados[i].gerente) g += receitaBase(i) / tempo(i);
     }
     return g;
   }
 
-  /// Estrelas que a próxima filial dá (10 · √(ganho da vida / 1 bilhão)).
+  double get ganhoPorSegundo => ganhoPorSegundoBase * multTemporario;
+
+  /// Valor de referência para recompensas: o faturamento ou, no começo, o da limonada.
+  double get _referencia => max(ganhoPorSegundoBase, max(receitaBase(0) / tempo(0), 1));
+
   int get estrelasPossiveis => (10 * sqrt(ganhoDaVida / 1e9)).floor();
   int get estrelasNovas => max(0, estrelasPossiveis - estrelas);
 
+  /// Nível do Império: sobe a cada 5x de faturamento total (R$ 100, 500, 2,5 mil...).
+  int get nivelImperio => ganhoDaVida < 100 ? 1 : (log(ganhoDaVida / 100) / log(5)).floor() + 2;
+
+  double progressoImperio() {
+    final n = nivelImperio;
+    final ini = n == 1 ? 0.0 : 100 * pow(5, n - 2).toDouble();
+    final fim = 100 * pow(5, n - 1).toDouble();
+    return ((ganhoDaVida - ini) / (fim - ini)).clamp(0.0, 1.0);
+  }
+
+  int get fachada => min(fachadas.length - 1, (nivelImperio - 1) ~/ 3);
+
   // ---------------- ações ----------------
-  /// Toque no produto: começa a preparar (se não tiver gerente).
   bool tocar(int i) {
     final e = estados[i];
     if (e.nivel == 0 || e.gerente || e.rodando) return false;
@@ -143,7 +234,6 @@ class MotorTycoon {
     return true;
   }
 
-  /// Compra [n] níveis. Retorna true se atingiu um marco novo.
   bool comprar(int i, int n) {
     if (n <= 0) return false;
     final c = custo(i, n);
@@ -177,6 +267,7 @@ class MotorTycoon {
 
   /// Avança o tempo. Devolve as vendas concluídas.
   List<Venda> passo(double dt) {
+    _relogio += dt;
     final vendas = <Venda>[];
     for (var i = 0; i < produtos.length; i++) {
       final e = estados[i];
@@ -186,6 +277,7 @@ class MotorTycoon {
         final ciclos = e.gerente ? e.progresso.floor() : 1;
         final v = receita(i) * ciclos;
         _ganhar(v);
+        e.vendas += ciclos;
         vendas.add(Venda(i, v));
         if (e.gerente) {
           e.progresso -= ciclos;
@@ -195,6 +287,21 @@ class MotorTycoon {
         }
       }
     }
+    // efeitos temporários
+    turboDobro = max(0, turboDobro - dt);
+    ondaCalor = max(0, ondaCalor - dt);
+    if (rush > 0) {
+      rush = max(0, rush - dt);
+    } else {
+      proximoRush -= dt;
+      if (proximoRush <= 0) iniciarRush();
+    }
+    proximoCalor -= dt;
+    if (proximoCalor <= 0) {
+      ondaCalor = 30;
+      proximoCalor = 200 + _rnd.nextDouble() * 160;
+    }
+    if (_relogio - _ultimoAtendimento > 1.3) combo = 0;
     // cliente VIP
     if (vipVisivel > 0) {
       vipVisivel = max(0, vipVisivel - dt);
@@ -208,26 +315,127 @@ class MotorTycoon {
     return vendas;
   }
 
-  /// Gorjeta do cliente VIP: 1 minuto de faturamento (ou o mínimo para o começo).
-  double get valorVip => max(ganhoPorSegundo * 60, max(receita(0) * 25, 50));
+  // ---------------- VIP ----------------
+  double get valorVip => max(_referencia * 60, max(receitaBase(0) * 25, 50));
 
+  /// Atende o VIP: dinheiro + 1 gema.
   double atenderVip() {
     if (vipVisivel <= 0) return 0;
     final v = valorVip;
     _ganhar(v);
     vipVisivel = 0;
+    vipsAtendidos++;
+    gemas++;
     return v;
   }
 
-  /// Ganho enquanto o app estava fechado (só com gerentes, até 3 horas).
+  // ---------------- Hora do Rush ----------------
+  void iniciarRush() {
+    rush = duracaoRush;
+    combo = 0;
+    proximoRush = 150 + _rnd.nextDouble() * 120;
+  }
+
+  /// Valor de um cliente do rush (cresce com o combo, até x10). Dourado vale 5x e pode dar gema.
+  double atenderClienteRush({bool dourado = false}) {
+    if (rush <= 0) return 0;
+    combo = (_relogio - _ultimoAtendimento <= 1.3) ? combo + 1 : 1;
+    _ultimoAtendimento = _relogio;
+    clientesRush++;
+    final v = max(_referencia * 2, 2.0) * min(combo, 10) * (dourado ? 5 : 1);
+    _ganhar(v);
+    if (dourado && _rnd.nextDouble() < 0.5) gemas++;
+    return v;
+  }
+
+  // ---------------- Turbos ----------------
+  /// Compra um turbo com gemas. Devolve o dinheiro ganho (viagem no tempo) ou 0.
+  double usarTurbo(Turbo t) {
+    final c = custoTurbo[t]!;
+    if (gemas < c) return -1;
+    if (t == Turbo.rush && rush > 0) return -1;
+    gemas -= c;
+    switch (t) {
+      case Turbo.dobro:
+        turboDobro += 300; // 5 minutos
+        return 0;
+      case Turbo.tempo:
+        final v = _referencia * 3600; // 1 hora de faturamento na hora
+        _ganhar(v);
+        return v;
+      case Turbo.rush:
+        iniciarRush();
+        return 0;
+    }
+  }
+
+  // ---------------- Missões ----------------
+  double valorMissao(Missao m) => switch (m.tipo) {
+        TipoMissao.abrir || TipoMissao.nivel => estados[m.produto].nivel.toDouble(),
+        TipoMissao.vender => estados[m.produto].vendas.toDouble(),
+        TipoMissao.gerente => estados[m.produto].gerente ? 1 : 0,
+        TipoMissao.vip => vipsAtendidos.toDouble(),
+        TipoMissao.rush => clientesRush.toDouble(),
+        TipoMissao.filial => filiais.toDouble(),
+        TipoMissao.ganhar => ganhoDaVida,
+      };
+
+  double progressoMissao(int k) => (valorMissao(missoes[k]) / missoes[k].alvo).clamp(0.0, 1.0);
+
+  /// As 3 próximas missões ainda não resgatadas.
+  List<int> get missoesAtivas => [
+        for (var k = 0; k < missoes.length; k++)
+          if (!missoesFeitas.contains(k)) k,
+      ].take(3).toList();
+
+  int get missoesProntas => missoesAtivas.where((k) => progressoMissao(k) >= 1).length;
+
+  double recompensaMissao(int k) => _referencia * 60 * missoes[k].minutosDeGanho;
+
+  /// Resgata a recompensa. Devolve o dinheiro ganho (ou -1 se não estava pronta).
+  double resgatarMissao(int k) {
+    if (missoesFeitas.contains(k) || !missoesAtivas.contains(k) || progressoMissao(k) < 1) return -1;
+    final v = recompensaMissao(k);
+    missoesFeitas.add(k);
+    gemas += missoes[k].gemas;
+    _ganhar(v);
+    return v;
+  }
+
+  /// Gemas por cada Nível do Império novo (chame depois de ganhar dinheiro).
+  int premiarNivelImperio() {
+    final n = nivelImperio;
+    if (n <= nivelImperioPremiado) return 0;
+    final novas = (n - nivelImperioPremiado) * 2;
+    nivelImperioPremiado = n;
+    gemas += novas;
+    return novas;
+  }
+
+  // ---------------- Baú diário ----------------
+  static int dia(DateTime d) => DateTime.utc(d.year, d.month, d.day).millisecondsSinceEpoch ~/ 86400000;
+
+  bool podeAbrirBau(DateTime agora) => dia(agora) > ultimoBau;
+
+  /// Abre o baú do dia: 3 a 8 gemas + 15 minutos de faturamento.
+  (int, double) abrirBau(DateTime agora) {
+    if (!podeAbrirBau(agora)) return (0, 0);
+    ultimoBau = dia(agora);
+    final g = 3 + _rnd.nextInt(6);
+    final v = _referencia * 60 * 15;
+    gemas += g;
+    _ganhar(v);
+    return (g, v);
+  }
+
+  // ---------------- offline / filial ----------------
   double ganhoOffline(double segundos) {
     final s = segundos.clamp(0, 3 * 3600).toDouble();
-    final v = ganhoPorSegundo * s;
+    final v = ganhoPorSegundoBase * s;
     if (v > 0) _ganhar(v);
     return v;
   }
 
-  /// Nova filial: recomeça do zero, mas com as estrelas (bônus permanente).
   bool abrirFilial() {
     if (estrelasNovas <= 0) return false;
     estrelas = estrelasPossiveis;
@@ -248,15 +456,22 @@ class MotorTycoon {
 
   // ---------------- salvar / carregar ----------------
   Map<String, dynamic> paraJson(DateTime agora) => {
-        'v': 1,
+        'v': 2,
         'dinheiro': dinheiro,
         'ganhoDaFilial': ganhoDaFilial,
         'ganhoDaVida': ganhoDaVida,
         'estrelas': estrelas,
         'filiais': filiais,
+        'gemas': gemas,
+        'vips': vipsAtendidos,
+        'rush': clientesRush,
+        'imperio': nivelImperioPremiado,
+        'bau': ultimoBau,
+        'turbo': turboDobro,
         'compradas': compradas.toList(),
+        'missoes': missoesFeitas.toList(),
         'produtos': [
-          for (final e in estados) {'n': e.nivel, 'g': e.gerente, 'p': e.progresso}
+          for (final e in estados) {'n': e.nivel, 'g': e.gerente, 'p': e.progresso, 'v': e.vendas}
         ],
         'salvoEm': agora.millisecondsSinceEpoch,
       };
@@ -264,21 +479,37 @@ class MotorTycoon {
   /// Carrega o jogo salvo. Retorna os segundos que o app ficou fechado.
   double carregar(Map<String, dynamic> j, DateTime agora) {
     double num_(String k) => (j[k] as num?)?.toDouble() ?? 0;
-    dinheiro = num_('dinheiro');
-    ganhoDaFilial = num_('ganhoDaFilial');
-    ganhoDaVida = num_('ganhoDaVida');
-    estrelas = (j['estrelas'] as num?)?.toInt() ?? 0;
-    filiais = (j['filiais'] as num?)?.toInt() ?? 1;
+    int int_(String k, [int padrao = 0]) => max(0, (j[k] as num?)?.toInt() ?? padrao);
+    Set<int> conjunto(String k, int limite) => ((j[k] as List?) ?? [])
+        .whereType<num>()
+        .map((e) => e.toInt())
+        .where((x) => x >= 0 && x < limite)
+        .toSet();
+    dinheiro = max(0, num_('dinheiro'));
+    ganhoDaFilial = max(0, num_('ganhoDaFilial'));
+    ganhoDaVida = max(0, num_('ganhoDaVida'));
+    estrelas = int_('estrelas');
+    filiais = max(1, int_('filiais', 1));
+    gemas = int_('gemas');
+    vipsAtendidos = int_('vips');
+    clientesRush = int_('rush');
+    nivelImperioPremiado = max(1, int_('imperio', nivelImperio));
+    ultimoBau = int_('bau');
+    turboDobro = num_('turbo').clamp(0, 3600).toDouble();
     compradas
       ..clear()
-      ..addAll(((j['compradas'] as List?) ?? []).map((e) => (e as num).toInt()).where((k) => k >= 0 && k < melhorias.length));
+      ..addAll(conjunto('compradas', melhorias.length));
+    missoesFeitas
+      ..clear()
+      ..addAll(conjunto('missoes', missoes.length));
     final ps = (j['produtos'] as List?) ?? [];
     for (var i = 0; i < estados.length && i < ps.length; i++) {
-      final p = ps[i] as Map;
+      final p = ps[i] is Map ? ps[i] as Map : const {};
       estados[i]
         ..nivel = max(0, (p['n'] as num?)?.toInt() ?? 0)
         ..gerente = p['g'] == true
         ..progresso = ((p['p'] as num?)?.toDouble() ?? 0).clamp(0, 0.999)
+        ..vendas = max(0, (p['v'] as num?)?.toInt() ?? 0)
         ..rodando = false;
     }
     if (estados[0].nivel == 0) estados[0].nivel = 1;

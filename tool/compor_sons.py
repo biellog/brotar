@@ -143,9 +143,98 @@ def toque():
     return env(np.sin(2 * np.pi * 1500 * tt) * 0.6 + np.sin(2 * np.pi * 750 * tt), 0.0005, 120)
 
 
+def passa_baixa(x, corte):
+    """Filtro passa-baixa suave (no domínio da frequência)."""
+    esp = np.fft.rfft(x)
+    fr = np.fft.rfftfreq(len(x), 1 / SR)
+    return np.fft.irfft(esp / np.sqrt(1 + (fr / corte) ** 4), len(x))
+
+
+def rush():
+    """Apito duplo + rufar de tambor: a multidão chegou!"""
+    x = np.zeros(int(1.2 * SR))
+    for k, ini in enumerate((0.0, 0.18)):
+        tt = t(0.14)
+        f = 2600 + 120 * np.sin(2 * np.pi * 38 * tt)  # trinado do apito
+        fase = 2 * np.pi * np.cumsum(f) / SR
+        ap = np.sin(fase) * np.minimum(1, tt / 0.01) * np.minimum(1, (0.14 - tt) / 0.02)
+        colocar(x, ap * 0.5, ini)
+    for k in range(14):  # rufar acelerando
+        tt = t(0.12)
+        bumbo = env(np.sin(2 * np.pi * (140 * np.exp(-tt * 18) + 60) * tt), 0.002, 22)
+        caixinha = passa_baixa(ruido_agudo(0.12, 70), 3500) * 0.05
+        colocar(x, bumbo * (0.4 + 0.04 * k) + caixinha, 0.4 + k * 0.045 * (1 - k / 28))
+    colocar(x, sino(hz(84), 0.6, 5) * 0.4 + sino(hz(88), 0.6, 5) * 0.35, 0.95)
+    return x
+
+
+def combo(n):
+    """'Pop' que sobe de tom a cada nível de combo."""
+    tt = t(0.13)
+    base = hz(76 + 3 * n)
+    f = base * (1 + 0.6 * np.exp(-tt * 40))
+    fase = 2 * np.pi * np.cumsum(f) / SR
+    return env(np.sin(fase) + 0.25 * np.sin(2 * fase), 0.001, 22)
+
+
+def gema():
+    """Brilho cristalino: notas agudas rápidas em cascata."""
+    x = np.zeros(int(0.7 * SR))
+    for k, m in enumerate([96, 100, 103, 108, 103]):
+        colocar(x, sino(hz(m), 0.4, 9, 0.4) * (0.7 - 0.08 * k), k * 0.045)
+    return x
+
+
+def missao():
+    """Jingle de missão cumprida: 'ta-da-dá!'"""
+    x = np.zeros(int(1.0 * SR))
+    for m, ini, dur in [(72, 0.0, 0.12), (76, 0.12, 0.12), (79, 0.24, 0.5)]:
+        tt = t(dur + 0.3)
+        f = hz(m)
+        s = sum(np.sin(2 * np.pi * f * h * tt) / h ** 1.5 for h in range(1, 6))
+        colocar(x, env(s, 0.005, 3.5 if dur > 0.2 else 9) * 0.5, ini)
+    for m in (84, 88, 91):
+        colocar(x, sino(hz(m), 0.6, 4, 0.5) * 0.25, 0.26)
+    return x
+
+
+def bau():
+    """Baú abrindo: rangido de madeira + chuva de moedas."""
+    x = np.zeros(int(1.4 * SR))
+    tt = t(0.35)
+    f = 180 + 90 * np.sin(2 * np.pi * 3 * tt) + 40 * rng.standard_normal(len(tt)).cumsum() / 300
+    fase = 2 * np.pi * np.cumsum(f) / SR
+    tremido = 1 + 0.5 * np.sin(2 * np.pi * 23 * tt)  # madeira "tremendo"
+    rangido = (np.sin(fase) + 0.45 * np.sin(2 * fase) + 0.2 * np.sin(3 * fase)) * tremido
+    rangido *= 0.3 * np.minimum(1, tt / 0.05) * np.exp(-tt * 3)
+    colocar(x, rangido * 0.5, 0)
+    for k in range(10):
+        colocar(x, sino(hz(int(rng.choice([88, 91, 93, 95, 96, 100]))), 0.3, 12, 0.7) * 0.35, 0.33 + k * 0.06 + rng.uniform(0, 0.03))
+    colocar(x, caixa() * 0.6, 0.3)
+    return x
+
+
+def calor():
+    """'Fiuuu' quente: ruído filtrado subindo + brilho."""
+    dur = 0.9
+    tt = t(dur)
+    r = rng.standard_normal(len(tt))
+    esp = np.fft.rfft(r)
+    fr = np.fft.rfftfreq(len(r), 1 / SR)
+    esp *= np.exp(-((fr - 1800) / 900) ** 2)
+    x = np.fft.irfft(esp, len(r)) * np.sin(np.pi * tt / dur) ** 2
+    x /= np.abs(x).max() + 1e-9
+    f = 300 * 2 ** (tt / dur * 1.5)
+    x = x * 0.6 + 0.3 * np.sin(2 * np.pi * np.cumsum(f) / SR) * np.sin(np.pi * tt / dur)
+    return x
+
+
 if __name__ == "__main__":
     pasta = sys.argv[1]
     for nome, fn in [("ty_moeda", moeda), ("ty_caixa", caixa), ("ty_compra", compra), ("ty_marco", marco),
-                     ("ty_gerente", gerente), ("ty_filial", filial), ("ty_toque", toque)]:
+                     ("ty_gerente", gerente), ("ty_filial", filial), ("ty_toque", toque),
+                     ("ty_rush", rush), ("ty_gema", gema), ("ty_missao", missao), ("ty_bau", bau), ("ty_calor", calor),
+                     ("ty_combo1", lambda: combo(0)), ("ty_combo2", lambda: combo(1)),
+                     ("ty_combo3", lambda: combo(2)), ("ty_combo4", lambda: combo(3))]:
         salvar(nome, fn(), pasta)
         print(nome)

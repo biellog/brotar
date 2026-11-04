@@ -20,7 +20,16 @@ enum Efeito {
   tyMarco('sons/ty_marco.ogg'),
   tyGerente('sons/ty_gerente.ogg'),
   tyFilial('sons/ty_filial.ogg'),
-  tyToque('sons/ty_toque.ogg');
+  tyToque('sons/ty_toque.ogg'),
+  tyRush('sons/ty_rush.ogg'),
+  tyGema('sons/ty_gema.ogg'),
+  tyMissao('sons/ty_missao.ogg'),
+  tyBau('sons/ty_bau.ogg'),
+  tyCalor('sons/ty_calor.ogg'),
+  tyCombo1('sons/ty_combo1.ogg'),
+  tyCombo2('sons/ty_combo2.ogg'),
+  tyCombo3('sons/ty_combo3.ogg'),
+  tyCombo4('sons/ty_combo4.ogg');
 
   final String arquivo;
   const Efeito(this.arquivo);
@@ -72,7 +81,8 @@ class Musica {
     for (final e in Efeito.values) {
       final lista = <AudioPlayer>[];
       // sons rápidos e repetidos ganham 3 "vozes"; os raros, 2
-      const frequentes = {Efeito.tyMoeda, Efeito.plastico, Efeito.bolhaCerta, Efeito.carta, Efeito.tyToque};
+      const frequentes = {Efeito.tyMoeda, Efeito.plastico, Efeito.bolhaCerta, Efeito.carta, Efeito.tyToque,
+          Efeito.tyCombo1, Efeito.tyCombo2, Efeito.tyCombo3, Efeito.tyCombo4};
       final vozes = frequentes.contains(e) ? 3 : 2;
       for (var i = 0; i < vozes; i++) {
         final p = AudioPlayer(playerId: '${e.name}_$i');
