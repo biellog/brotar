@@ -29,6 +29,12 @@ class _Texto {
   _Texto(this.pos, this.texto, this.cor);
 }
 
+class _Poeira {
+  Offset pos;
+  double vida = 1;
+  _Poeira(this.pos);
+}
+
 class _Confete {
   Offset pos, vel;
   final Color cor;
@@ -70,6 +76,9 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
   final _moedas = <_Moeda>[];
   final _textos = <_Texto>[];
   final _confetes = <_Confete>[];
+  final _poeiras = <_Poeira>[];
+  bool _pc = false, _skills = false;
+  int _abaPc = 0;
   final _inicio = DateTime.now();
   int _coposNoInicio = 0;
 
@@ -180,6 +189,20 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
             Musica.efeito(Efeito.tyMarco);
             HapticFeedback.mediumImpact();
             _confete(pos, 20);
+          case TipoEvento.missao:
+            Musica.efeito(Efeito.tyMissao);
+            HapticFeedback.heavyImpact();
+            _confete(Offset(_tela.width / 2, 120), 60);
+            _textos.add(_Texto(Offset(_tela.width / 2, _tela.height * 0.32), '✅ ${e.texto}\n+R\$ ${e.valor.toStringAsFixed(0)}  ·  +1 ⭐', Colors.white));
+            _salvar();
+          case TipoEvento.sentou:
+            Musica.efeito(Efeito.tyGema);
+            HapticFeedback.mediumImpact();
+            _direcao = Offset.zero;
+            _joyOrigem = null;
+            _pc = true;
+          case TipoEvento.poeira:
+            _poeiras.add(_Poeira(iso.p(e.x, e.y) + Offset(_rnd.nextDouble() * 10 - 5, 0)));
         }
       }
     }
@@ -202,6 +225,12 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
       c.vida -= dt;
     }
     _confetes.removeWhere((c) => c.vida <= 0);
+    for (final p in _poeiras) {
+      p.vida -= dt * 2.2;
+      p.pos += Offset(0, -18 * dt);
+    }
+    _poeiras.removeWhere((p) => p.vida <= 0);
+    if (!_m.sentado && _pc) _pc = false;
     if (_t - _ultimoSalvo > 6) {
       _ultimoSalvo = _t;
       _salvar();
@@ -216,6 +245,18 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
       final v = 120 + _rnd.nextDouble() * 240;
       _confetes.add(_Confete(p, Offset(cos(a) * v, sin(a) * v - 200), cores[k % cores.length], 1 + _rnd.nextDouble() * 0.6, a));
     }
+  }
+
+  void _comprouNoPc(bool ok) {
+    if (ok) {
+      Musica.efeito(Efeito.tyCompra);
+      HapticFeedback.mediumImpact();
+      _confete(Offset(_tela.width / 2, _tela.height / 2), 25);
+      _salvar();
+    } else {
+      HapticFeedback.heavyImpact();
+    }
+    setState(() {});
   }
 
   Offset? _alvoMoedas() {
@@ -264,7 +305,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
             // efeitos (moedas voando até o caixa, textos e confete)
             Positioned.fill(
               child: IgnorePointer(
-                child: CustomPaint(painter: _PintorEfeitos(_moedas, _alvoMoedas(), _textos, _confetes)),
+                child: CustomPaint(painter: _PintorEfeitos(_moedas, _alvoMoedas(), _textos, _confetes, _poeiras)),
               ),
             ),
             SafeArea(
@@ -290,17 +331,14 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                       ),
                     ),
                     const Spacer(),
+                    _BotaoSkills(pontos: _m.pontosHabilidade, aoTocar: () => setState(() => _skills = true)),
+                    const SizedBox(width: 6),
                     const _FundoBotaoMusica(),
                   ]),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(16)),
-                  child: Text(_m.objetivo,
-                      textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                ),
+                _BannerMissao(m: _m),
+                _BarraBoosts(m: _m),
                 const Spacer(),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
@@ -321,6 +359,27 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                   ),
               ]),
             ),
+            if (_pc)
+              Positioned.fill(
+                child: _Computador(
+                  m: _m,
+                  aba: _abaPc,
+                  trocarAba: (a) => setState(() => _abaPc = a),
+                  comprou: _comprouNoPc,
+                  levantar: () => setState(() {
+                    _m.levantar();
+                    _pc = false;
+                    _salvar();
+                  }),
+                ),
+              ),
+            if (_skills && !_pc)
+              Positioned.fill(
+                child: _FundoEscuro(
+                  fechar: () => setState(() => _skills = false),
+                  child: _PainelSkills(m: _m, comprou: _comprouNoPc),
+                ),
+              ),
           ]);
         }),
       ),
@@ -374,10 +433,14 @@ class _PintorEfeitos extends CustomPainter {
   final Offset? alvo;
   final List<_Texto> textos;
   final List<_Confete> confetes;
-  _PintorEfeitos(this.moedas, this.alvo, this.textos, this.confetes);
+  final List<_Poeira> poeiras;
+  _PintorEfeitos(this.moedas, this.alvo, this.textos, this.confetes, this.poeiras);
 
   @override
   void paint(Canvas c, Size s) {
+    for (final p in poeiras) {
+      c.drawCircle(p.pos, 4 + (1 - p.vida) * 7, Paint()..color = const Color(0xFFD7C4A3).withValues(alpha: 0.55 * p.vida));
+    }
     final destino = alvo ?? Offset(s.width / 2, 40);
     for (final mo in moedas) {
       if (mo.t < 0) continue;
@@ -414,6 +477,7 @@ class _PintorEfeitos extends CustomPainter {
           ),
         ),
         textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
       )..layout();
       tp.paint(c, tx.pos - Offset(tp.width / 2, tp.height / 2 + (1 - tx.vida) * 50));
     }
@@ -421,4 +485,397 @@ class _PintorEfeitos extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter old) => true;
+}
+
+// ---------------- HUD: missão, boosts e habilidades ----------------
+class _BannerMissao extends StatelessWidget {
+  final Mundo m;
+  const _BannerMissao({required this.m});
+
+  @override
+  Widget build(BuildContext context) {
+    final mi = m.missaoAtual;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _ouro.withValues(alpha: 0.6)),
+      ),
+      child: mi == null
+          ? const Text('🏆 Você completou todas as missões! Agora é crescer o império.',
+              textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))
+          : Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                Text('🎯 ${m.missao + 1}/${missoes.length}',
+                    style: const TextStyle(color: _ouro, fontWeight: FontWeight.w900, fontSize: 12)),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(mi.texto,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14))),
+                Text('${reais3d(mi.premio)} +1⭐',
+                    style: const TextStyle(color: Color(0xFFFFE08A), fontWeight: FontWeight.w800, fontSize: 12)),
+              ]),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: m.progressoMissao,
+                  minHeight: 7,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation(_ouro),
+                ),
+              ),
+            ]),
+    );
+  }
+}
+
+class _BarraBoosts extends StatelessWidget {
+  final Mundo m;
+  const _BarraBoosts({required this.m});
+
+  @override
+  Widget build(BuildContext context) {
+    final ativos = Boost.values.where(m.ativo).toList();
+    if (ativos.isEmpty) return const SizedBox(height: 4);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(spacing: 6, children: [
+        for (final b in ativos)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF7B2FF7), Color(0xFFF107A3)]),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('${b.emoji} ${m.boosts[b]!.ceil()}s',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+          ),
+      ]),
+    );
+  }
+}
+
+class _BotaoSkills extends StatelessWidget {
+  final int pontos;
+  final VoidCallback aoTocar;
+  const _BotaoSkills({required this.pontos, required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) => Stack(clipBehavior: Clip.none, children: [
+        Material(
+          color: Colors.black38,
+          shape: const CircleBorder(),
+          child: IconButton(icon: const Icon(Icons.auto_awesome, color: _ouro), tooltip: 'Habilidades', onPressed: aoTocar),
+        ),
+        if (pontos > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(color: Color(0xFFFF4D6D), shape: BoxShape.circle),
+              child: Text('$pontos', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+            ),
+          ),
+      ]);
+}
+
+class _FundoEscuro extends StatelessWidget {
+  final VoidCallback fechar;
+  final Widget child;
+  const _FundoEscuro({required this.fechar, required this.child});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: fechar,
+        child: Container(
+          color: Colors.black54,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(16),
+          child: GestureDetector(
+            onTap: () {},
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460, maxHeight: 620),
+              child: Material(
+                color: const Color(0xFF14213D),
+                borderRadius: BorderRadius.circular(22),
+                clipBehavior: Clip.antiAlias,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: fechar),
+                  ),
+                  Flexible(child: child),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _PainelSkills extends StatelessWidget {
+  final Mundo m;
+  final void Function(bool) comprou;
+  const _PainelSkills({required this.m, required this.comprou});
+
+  @override
+  Widget build(BuildContext context) => ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+        const Text('⭐ Habilidades', textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 4),
+        Text('Pontos: ${m.pontosHabilidade}  ·  cada missão completa dá +1 ponto',
+            textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFFFE08A), fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        for (final h in Habilidade.values)
+          _Linha(
+            emoji: h.emoji,
+            titulo: h.nome,
+            sub: h.efeito,
+            nivel: m.nivel(h),
+            maxNivel: maxHabilidade,
+            preco: m.nivel(h) >= maxHabilidade ? 'MÁX' : '${m.custoHabilidade(h)} ⭐',
+            pode: m.nivel(h) < maxHabilidade && m.pontosHabilidade >= m.custoHabilidade(h),
+            aoTocar: () => comprou(m.subirHabilidade(h)),
+          ),
+      ]);
+}
+
+/// Uma linha de compra (ícone, nome, nível em bolinhas e botão de preço).
+class _Linha extends StatelessWidget {
+  final String emoji, titulo, sub, preco;
+  final int nivel, maxNivel;
+  final bool pode;
+  final VoidCallback aoTocar;
+  const _Linha({
+    required this.emoji,
+    required this.titulo,
+    required this.sub,
+    required this.preco,
+    required this.pode,
+    required this.aoTocar,
+    this.nivel = 0,
+    this.maxNivel = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14)),
+        child: Row(children: [
+          Text(emoji, style: const TextStyle(fontSize: 28)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(titulo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+              Text(sub, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              if (maxNivel > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(children: [
+                    for (var k = 0; k < maxNivel; k++)
+                      Container(
+                        width: 12,
+                        height: 6,
+                        margin: const EdgeInsets.only(right: 3),
+                        decoration: BoxDecoration(
+                          color: k < nivel ? _ouro : Colors.white24,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                  ]),
+                ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(92, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              backgroundColor: pode ? const Color(0xFF1FAF7A) : Colors.white12,
+              foregroundColor: pode ? Colors.white : Colors.white54,
+            ),
+            onPressed: aoTocar,
+            child: Text(preco, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+          ),
+        ]),
+      );
+}
+
+// ---------------- computador da gerência ----------------
+class _Computador extends StatelessWidget {
+  final Mundo m;
+  final int aba;
+  final void Function(int) trocarAba;
+  final void Function(bool) comprou;
+  final VoidCallback levantar;
+  const _Computador({required this.m, required this.aba, required this.trocarAba, required this.comprou, required this.levantar});
+
+  static const _abas = ['⚡ Boosts', '🏢 Empresa', '🧑‍🍳 Equipe', '⭐ Skills'];
+
+  @override
+  Widget build(BuildContext context) {
+    final equipMax = Mundo.maxNivelEquip;
+    final itens = switch (aba) {
+      0 => [
+          for (final b in Boost.values)
+            _Linha(
+              emoji: b.emoji,
+              titulo: b.nome,
+              sub: '${b.descricao} · ${b.duracao.toInt()}s${m.ativo(b) ? ' (ativo: ${m.boosts[b]!.ceil()}s)' : ''}',
+              preco: reais3d(m.custoBoost(b)),
+              pode: m.dinheiro >= m.custoBoost(b),
+              aoTocar: () => comprou(m.comprarBoost(b)),
+            ),
+        ],
+      1 => [
+          for (final e in Melhoria.values)
+            _Linha(
+              emoji: e.emoji,
+              titulo: e.nome,
+              sub: e.descricao,
+              nivel: m.nivelMelhoria(e),
+              maxNivel: e.maxNivel,
+              preco: m.nivelMelhoria(e) >= e.maxNivel ? 'FEITO ✓' : reais3d(m.custoMelhoria(e)),
+              pode: m.nivelMelhoria(e) < e.maxNivel && m.dinheiro >= m.custoMelhoria(e),
+              aoTocar: () => comprou(m.comprarMelhoria(e)),
+            ),
+        ],
+      2 => [
+          _Linha(
+            emoji: '🧑‍🍳',
+            titulo: 'Contratar alguém pra trabalhar',
+            sub: 'Pega copos e vende sozinho (${m.ajudantes.length}/${Mundo.custosAjudante.length}), até com o app fechado',
+            nivel: m.ajudantes.length,
+            maxNivel: Mundo.custosAjudante.length,
+            preco: m.custoAjudante.isInfinite ? 'EQUIPE ✓' : reais3d(m.custoAjudante),
+            pode: m.dinheiro >= m.custoAjudante,
+            aoTocar: () => comprou(m.contratarAjudante()),
+          ),
+          _Linha(
+            emoji: '🎒',
+            titulo: 'Mochila maior',
+            sub: '+2 copos carregados (agora: ${m.capacidade})',
+            nivel: m.nivelMochila,
+            maxNivel: equipMax,
+            preco: m.nivelMochila >= equipMax ? 'MÁX' : reais3d(m.custoMochila),
+            pode: m.nivelMochila < equipMax && m.dinheiro >= m.custoMochila,
+            aoTocar: () => comprou(m.comprarMochila()),
+          ),
+          _Linha(
+            emoji: '👟',
+            titulo: 'Tênis de corrida',
+            sub: 'Você anda mais rápido',
+            nivel: m.nivelTenis,
+            maxNivel: equipMax,
+            preco: m.nivelTenis >= equipMax ? 'MÁX' : reais3d(m.custoTenis),
+            pode: m.nivelTenis < equipMax && m.dinheiro >= m.custoTenis,
+            aoTocar: () => comprou(m.comprarTenis()),
+          ),
+        ],
+      _ => [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Pontos: ${m.pontosHabilidade} ⭐ (ganhe completando missões)',
+                textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFFFE08A), fontWeight: FontWeight.w700)),
+          ),
+          for (final h in Habilidade.values)
+            _Linha(
+              emoji: h.emoji,
+              titulo: h.nome,
+              sub: h.efeito,
+              nivel: m.nivel(h),
+              maxNivel: maxHabilidade,
+              preco: m.nivel(h) >= maxHabilidade ? 'MÁX' : '${m.custoHabilidade(h)} ⭐',
+              pode: m.nivel(h) < maxHabilidade && m.pontosHabilidade >= m.custoHabilidade(h),
+              aoTocar: () => comprou(m.subirHabilidade(h)),
+            ),
+        ],
+    };
+    return Container(
+      color: Colors.black.withValues(alpha: 0.6),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(children: [
+                // moldura do monitor
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF263238),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [BoxShadow(color: Color(0x884FC3F7), blurRadius: 30)],
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFF0D47A1), Color(0xFF0A1931)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          color: Colors.black26,
+                          child: Row(children: [
+                            const Text('🧃 SucoOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                            const Spacer(),
+                            Text('💵 ${reais3d(m.dinheiro)}', style: const TextStyle(color: _ouro, fontWeight: FontWeight.w900)),
+                          ]),
+                        ),
+                        SizedBox(
+                          height: 46,
+                          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(6), children: [
+                            for (var k = 0; k < _abas.length; k++)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(_abas[k]),
+                                  selected: aba == k,
+                                  onSelected: (_) => trocarAba(k),
+                                  selectedColor: _ouro,
+                                  labelStyle: TextStyle(
+                                      fontWeight: FontWeight.w800, color: aba == k ? Colors.black : Colors.white),
+                                  backgroundColor: Colors.white10,
+                                  showCheckmark: false,
+                                ),
+                              ),
+                          ]),
+                        ),
+                        Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(10, 4, 10, 10), children: itens)),
+                      ]),
+                    ),
+                  ),
+                ),
+                // pé do monitor
+                Container(width: 70, height: 14, color: const Color(0xFF37474F)),
+                Container(
+                  width: 160,
+                  height: 8,
+                  decoration: BoxDecoration(color: const Color(0xFF37474F), borderRadius: BorderRadius.circular(4)),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(minimumSize: const Size(220, 48), backgroundColor: const Color(0xFFFF9F1C)),
+                  onPressed: levantar,
+                  icon: const Icon(Icons.directions_walk),
+                  label: const Text('Levantar e voltar a vender', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
