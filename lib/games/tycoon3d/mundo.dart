@@ -124,7 +124,7 @@ enum Boost {
 }
 
 // ---------------- Missões ----------------
-enum TipoMissao { copos, faturar, abrir, nivelLimonada, computador, ajudantes, boost, empresa, mochila }
+enum TipoMissao { copos, faturar, abrir, nivelLimonada, computador, ajudantes, boost, empresa, mochila, cidade }
 
 class Missao {
   final String texto;
@@ -169,8 +169,43 @@ class Pessoa {
   double parado = 0;
   double andando = 0;
   bool olhandoEsquerda = false;
+  String? placaAtual; // em cima de qual placa está
+  double naPlaca = 0; // há quanto tempo (só começa a cobrar depois de [esperaPlaca])
   Pessoa(this.x, this.y, {this.ajudante = false});
 }
+
+/// Segundos parado em cima da placa antes de começar a cobrar (evita compra sem querer).
+const esperaPlaca = 5.0;
+
+/// Agitos: acontecimentos surpresa na praça para o jogo nunca ficar parado.
+enum TipoAgito {
+  excursao('🚌', 'Excursão chegando!', 'Muitos clientes de uma vez', 22),
+  calor('🌞', 'Onda de calor!', 'Todo suco vale +50%', 25),
+  vip('👑', 'Cliente VIP!', 'Atenda antes da paciência acabar: paga 5x', 30),
+  moedas('🪙', 'Chuva de moedas!', 'Corra pela praça e pegue as moedas', 15),
+  fruta('🌟', 'Fruta dourada!', 'Pegue a fruta: enche todas as barracas', 20);
+
+  final String emoji, nome, descricao;
+  final double duracao;
+  const TipoAgito(this.emoji, this.nome, this.descricao, this.duracao);
+}
+
+class MoedaChao {
+  final double x, y, valor;
+  const MoedaChao(this.x, this.y, this.valor);
+}
+
+/// Cidades (recomeçar com bônus permanente).
+const nomesCidades = [
+  'Praça Central',
+  'Vila do Sol',
+  'Porto Alegria',
+  'Serra Verde',
+  'Cidade Nova',
+  'Ilha do Coco',
+  'Capital do Suco',
+];
+String nomeCidade(int i) => i < nomesCidades.length ? nomesCidades[i] : 'Cidade ${i + 1}';
 
 /// Outro jogador no mesmo império (modo em grupo).
 class Amigo extends Pessoa {
@@ -198,10 +233,12 @@ class Cliente {
   int vaga = -1;
   double feliz = 0;
   double andando = 0;
+  bool vip = false;
+  double paciencia = 0; // VIP: segundos até desistir
   Cliente(this.x, this.y, this.quer, this.faltam, this.aparencia);
 }
 
-enum TipoEvento { pegou, vendeu, comprou, abriu, contratou, missao, sentou, poeira }
+enum TipoEvento { pegou, vendeu, comprou, abriu, contratou, missao, sentou, poeira, combo, agito, moeda, fruta, vip, cidade }
 
 class Evento {
   final TipoEvento tipo;
@@ -244,6 +281,21 @@ class Mundo {
   final _eventosRede = <Evento>[];
   int _idCliente = 0;
 
+  // agito (eventos surpresa), combo e cidades
+  TipoAgito? agito;
+  double agitoResta = 0;
+  double _proximoAgito = 35;
+  final moedasChao = <MoedaChao>[];
+  (double, double)? fruta;
+  int combo = 0;
+  double comboTempo = 0;
+  int cidades = 0; // quantas vezes recomeçou em uma cidade nova
+  static const tempoCombo = 3.0;
+
+  double get multCombo => 1 + min(max(combo - 1, 0), 10) * 0.1; // até x2
+  double get bonusCidade => 1 + 0.5 * cidades;
+  bool get podeNovaCidade => abertas == sucos.length;
+
   static const custosAjudante = [150.0, 1500.0, 12000.0, 90000.0];
   static const maxNivelEquip = 5;
 
@@ -263,7 +315,9 @@ class Mundo {
       (1 + 0.08 * nivel(Habilidade.carisma)) *
       (nivelMelhoria(Melhoria.logo) > 0 ? 1.1 : 1) *
       (nivelMelhoria(Melhoria.franquia) > 0 ? 2 : 1) *
-      (ativo(Boost.promocao) ? 1.2 : 1);
+      (ativo(Boost.promocao) ? 1.2 : 1) *
+      (agito == TipoAgito.calor ? 1.5 : 1) *
+      bonusCidade;
   double get multProducao => (1 + 0.12 * nivel(Habilidade.barista)) * (ativo(Boost.producao) ? 2 : 1);
   double get velocidadeAjudante =>
       2.6 * (1 + 0.15 * nivel(Habilidade.lideranca)) * (nivelMelhoria(Melhoria.uniforme) > 0 ? 1.2 : 1);
@@ -378,8 +432,33 @@ class Mundo {
       'ajudante' => contratarAjudante(),
       'mochila' => comprarMochila(),
       'tenis' => comprarTenis(),
+      'cidade' => novaCidade(),
       _ => false,
     };
+  }
+
+  /// Recomeça numa cidade nova: barracas e dinheiro zeram, mas tudo vale +50% (para sempre).
+  /// Habilidades, melhorias da empresa, equipamentos e missões continuam.
+  bool novaCidade() {
+    if (!podeNovaCidade) return false;
+    cidades++;
+    dinheiro = 0;
+    pagos.clear();
+    clientes.clear();
+    moedasChao.clear();
+    fruta = null;
+    agito = null;
+    for (final b in barracas) {
+      b
+        ..aberta = b.indice == 0
+        ..nivel = 1
+        ..estoque = 0
+        ..progresso = 0;
+    }
+    for (final a in [jogador, ...ajudantes]) {
+      a.carga.clear();
+    }
+    return true;
   }
 
   /// Sai da cadeira (fecha o computador) e dá um passinho para fora dela.
@@ -390,7 +469,18 @@ class Mundo {
   }
 
   // ---------------- missões ----------------
-  Missao? get missaoAtual => missao < missoes.length ? missoes[missao] : null;
+  /// Depois das missões fixas vêm missões sem fim (vender, faturar, cidade nova...).
+  Missao? get missaoAtual {
+    if (missao < missoes.length) return missoes[missao];
+    final k = missao - missoes.length;
+    final premio = (precoMedio * 150 * (1 + k * 0.2)).roundToDouble();
+    final r = k ~/ 3 + 1;
+    return switch (k % 3) {
+      0 => Missao('Venda ${2000 + r * 1500} copos', TipoMissao.copos, 2000.0 + r * 1500, premio),
+      1 => Missao('Fature ${reais3d(1e6 * pow(4, r))}', TipoMissao.faturar, 1e6 * pow(4, r).toDouble(), premio),
+      _ => Missao('Abra uma cidade nova ($rª)', TipoMissao.cidade, r.toDouble(), premio),
+    };
+  }
 
   double valorMissao(Missao m) => switch (m.tipo) {
     TipoMissao.copos => copos.toDouble(),
@@ -402,6 +492,7 @@ class Mundo {
     TipoMissao.boost => boostsUsados.toDouble(),
     TipoMissao.empresa => totalMelhorias.toDouble(),
     TipoMissao.mochila => nivelMochila.toDouble(),
+    TipoMissao.cidade => cidades.toDouble(),
   };
 
   double get progressoMissao {
@@ -455,6 +546,7 @@ class Mundo {
     if (!sentado) _moverJogador(dt, dirX, dirY, eventos);
     _moverAmigos(dt);
     if (espelho) {
+      if (!sentado) _contarPlaca(jogador, dt);
       _cadeira(dt, eventos);
       _moverClientesEspelho(dt);
       return eventos;
@@ -477,6 +569,9 @@ class Mundo {
     for (final p in andando) {
       _placas(p, dt, eventos);
     }
+    comboTempo = max(0, comboTempo - dt);
+    if (comboTempo <= 0) combo = 0;
+    _agitos(dt, andando, eventos);
     if (amigos.values.any((a) => a.sentado)) usouComputador = true;
     _cadeira(dt, eventos);
     // delivery: vende sozinho pelo app
@@ -500,6 +595,80 @@ class Mundo {
       }
     }
     return eventos;
+  }
+
+  // ---------------- agitos ----------------
+  void _agitos(double dt, List<Pessoa> andando, List<Evento> eventos) {
+    // moedas e fruta dourada: quem passar por cima pega
+    for (final p in andando) {
+      for (final mo in moedasChao.where((mo) => (mo.x - p.x).abs() < 0.5 && (mo.y - p.y).abs() < 0.5).toList()) {
+        moedasChao.remove(mo);
+        dinheiro += mo.valor;
+        vendidoTotal += mo.valor;
+        eventos.add(Evento(TipoEvento.moeda, mo.x, mo.y, valor: mo.valor));
+      }
+      final f = fruta;
+      if (f != null && (f.$1 - p.x).abs() < 0.6 && (f.$2 - p.y).abs() < 0.6) {
+        fruta = null;
+        for (final b in barracas.where((b) => b.aberta)) {
+          b.estoque = capacidadeBarraca(b);
+        }
+        boosts[Boost.producao] = boosts[Boost.producao]! + 20;
+        agitoResta = 0;
+        eventos.add(Evento(TipoEvento.fruta, f.$1, f.$2, texto: '🌟 Barracas cheias + produção x2!'));
+      }
+    }
+    if (agito != null) {
+      agitoResta -= dt;
+      final vipAinda = clientes.any((c) => c.vip && c.estado != EstadoCliente.saindo);
+      if (agitoResta <= 0 || (agito == TipoAgito.vip && !vipAinda) || (agito == TipoAgito.moedas && moedasChao.isEmpty)) {
+        agito = null;
+        moedasChao.clear();
+        fruta = null;
+        _proximoAgito = 40 + _rnd.nextDouble() * 30;
+      }
+      return;
+    }
+    _proximoAgito -= dt;
+    if (_proximoAgito > 0 || copos < 5) return;
+    final opcoes = [TipoAgito.excursao, TipoAgito.calor, TipoAgito.moedas, TipoAgito.fruta, if (abertas >= 2) TipoAgito.vip];
+    comecarAgito(opcoes[_rnd.nextInt(opcoes.length)], eventos);
+  }
+
+  void comecarAgito(TipoAgito t, List<Evento> eventos) {
+    agito = t;
+    agitoResta = t.duracao;
+    moedasChao.clear();
+    fruta = null;
+    switch (t) {
+      case TipoAgito.moedas:
+        for (var k = 0; k < 14; k++) {
+          final (x, y) = _lugarLivre();
+          moedasChao.add(MoedaChao(x, y, (precoMedio * 2).ceilToDouble()));
+        }
+      case TipoAgito.fruta:
+        fruta = _lugarLivre();
+      case TipoAgito.vip:
+        final melhor = barracas.where((b) => b.aberta).last.indice;
+        clientes.add(
+          Cliente(larguraMapa + 0.5, ruaY, melhor, 3, _rnd.nextInt(8))
+            ..id = ++_idCliente
+            ..vip = true
+            ..paciencia = t.duracao,
+        );
+      case TipoAgito.excursao:
+      case TipoAgito.calor:
+        break;
+    }
+    eventos.add(Evento(TipoEvento.agito, jogador.x, jogador.y, suco: t.index, texto: '${t.emoji} ${t.nome}'));
+  }
+
+  (double, double) _lugarLivre() {
+    for (var k = 0; k < 40; k++) {
+      final x = 4.6 + _rnd.nextDouble() * 9.6, y = 5.6 + _rnd.nextDouble() * 9;
+      if (!_bate(x, y)) return (x, y);
+    }
+    return (8.6, 7.0);
   }
 
   void _moverAmigos(double dt) {
@@ -580,7 +749,8 @@ class Mundo {
     return {
       'e': paraJson(DateTime.now()),
       'cl': [
-        for (final c in clientes) [c.id, r(c.x), r(c.y), c.quer, c.faltam, c.aparencia, c.estado.index, r(c.feliz)],
+        for (final c in clientes)
+          [c.id, r(c.x), r(c.y), c.quer, c.faltam, c.aparencia, c.estado.index, r(c.feliz), c.vip ? 1 : 0, r(c.paciencia)],
       ],
       'js': {
         meuId: {'x': r(jogador.x), 'y': r(jogador.y), 'c': jogador.carga, 's': sentado, 'n': meuNome, 'o': minhaCor},
@@ -588,6 +758,12 @@ class Mundo {
           a.id: {'x': r(a.alvoX), 'y': r(a.alvoY), 'c': a.carga, 's': a.sentado, 'n': a.nome, 'o': a.cor},
       },
       'ev': ev,
+      'ag': agito == null ? null : [agito!.index, r(agitoResta)],
+      'mo': [
+        for (final mo in moedasChao) [r(mo.x), r(mo.y), mo.valor],
+      ],
+      'fr': fruta == null ? null : [r(fruta!.$1), r(fruta!.$2)],
+      'cb': [combo, r(comboTempo)],
     };
   }
 
@@ -612,7 +788,9 @@ class Mundo {
           ..alvoY = (item[2] as num).toDouble()
           ..faltam = item[4] is int ? (item[4] as int).clamp(0, 9) : 1
           ..estado = EstadoCliente.values[item[6] is int ? (item[6] as int).clamp(0, 2) : 0]
-          ..feliz = item[7] is num ? (item[7] as num).toDouble().clamp(0, 2) : 0;
+          ..feliz = item[7] is num ? (item[7] as num).toDouble().clamp(0, 2) : 0
+          ..vip = item.length > 8 && item[8] == 1
+          ..paciencia = item.length > 9 && item[9] is num ? (item[9] as num).toDouble().clamp(0, 60) : 0;
         clientes.add(c);
       }
     }
@@ -641,6 +819,31 @@ class Mundo {
         }
       }
       amigos.removeWhere((id, _) => !js.containsKey(id));
+    }
+    final ag = d['ag'];
+    if (ag is List && ag.length == 2 && ag[0] is int && ag[1] is num) {
+      agito = TipoAgito.values[(ag[0] as int).clamp(0, TipoAgito.values.length - 1)];
+      agitoResta = (ag[1] as num).toDouble().clamp(0, 60);
+    } else {
+      agito = null;
+    }
+    final mo = d['mo'];
+    moedasChao.clear();
+    if (mo is List) {
+      for (final x in mo.take(30)) {
+        if (x is List && x.length == 3 && x.every((v) => v is num && v.isFinite)) {
+          moedasChao.add(MoedaChao((x[0] as num).toDouble(), (x[1] as num).toDouble(), (x[2] as num).toDouble()));
+        }
+      }
+    }
+    final fr = d['fr'];
+    fruta = fr is List && fr.length == 2 && fr.every((v) => v is num)
+        ? ((fr[0] as num).toDouble(), (fr[1] as num).toDouble())
+        : null;
+    final cb = d['cb'];
+    if (cb is List && cb.length == 2 && cb[0] is int && cb[1] is num) {
+      combo = (cb[0] as int).clamp(0, 999);
+      comboTempo = (cb[1] as num).toDouble().clamp(0, tempoCombo);
     }
     final ev = d['ev'];
     final eventos = <Evento>[];
@@ -689,9 +892,19 @@ class Mundo {
     }
   }
 
+  /// Marca há quanto tempo a pessoa está em cima de uma placa. Devolve a placa (ou null).
+  Placa? _contarPlaca(Pessoa quem, double dt) {
+    final pl = placas.where((pl) => (pl.x - quem.x).abs() < 0.55 && (pl.y - quem.y).abs() < 0.55).firstOrNull;
+    if (pl?.id != quem.placaAtual) quem.naPlaca = 0;
+    quem.placaAtual = pl?.id;
+    if (pl != null) quem.naPlaca += dt;
+    return pl;
+  }
+
   void _placas(Pessoa quem, double dt, List<Evento> eventos) {
+    final atual = _contarPlaca(quem, dt);
     for (final pl in placas) {
-      if ((pl.x - quem.x).abs() < 0.55 && (pl.y - quem.y).abs() < 0.55 && dinheiro > 0) {
+      if (pl.id == atual?.id && quem.naPlaca >= esperaPlaca && dinheiro > 0) {
         final c = custo(pl);
         final ritmo = max(c / 1.3, 20.0) * dt;
         final v = min(ritmo, min(dinheiro, c - pl.pago));
@@ -755,7 +968,15 @@ class Mundo {
       if (k < 0) continue;
       p.carga.removeAt(k);
       c.faltam--;
-      final v = preco(barracas[c.quer]);
+      final eventos = <Evento>[];
+      if (!p.ajudante) {
+        combo = comboTempo > 0 ? combo + 1 : 1;
+        comboTempo = tempoCombo;
+        if (const [3, 5, 8, 11].contains(combo)) {
+          eventos.add(Evento(TipoEvento.combo, c.x, c.y, valor: multCombo, texto: 'COMBO x${multCombo.toStringAsFixed(1)}!'));
+        }
+      }
+      final v = preco(barracas[c.quer]) * (p.ajudante ? 1 : multCombo) * (c.vip ? 5 : 1);
       dinheiro += v;
       vendidoTotal += v;
       copos++;
@@ -763,8 +984,12 @@ class Mundo {
       if (c.faltam <= 0) {
         c.estado = EstadoCliente.saindo;
         c.feliz = 2;
+        if (c.vip) {
+          eventos.add(Evento(TipoEvento.vip, c.x, c.y, valor: v, texto: '👑 VIP satisfeito!'));
+          if (agito == TipoAgito.vip) agitoResta = 0;
+        }
       }
-      return [Evento(TipoEvento.vendeu, c.x, c.y, valor: v, suco: c.quer)];
+      return [Evento(TipoEvento.vendeu, c.x, c.y, valor: v, suco: c.quer), ...eventos];
     }
     return const [];
   }
@@ -807,8 +1032,9 @@ class Mundo {
 
   void _clientes(double dt) {
     final promo = ativo(Boost.promocao);
-    final maxClientes = 3 + abertas + nivel(Habilidade.marketing) + (promo ? 3 : 0);
-    _proximoCliente -= dt * (promo ? 2 : 1);
+    final excursao = agito == TipoAgito.excursao;
+    final maxClientes = 3 + abertas + nivel(Habilidade.marketing) + (promo ? 3 : 0) + (excursao ? 5 : 0);
+    _proximoCliente -= dt * (promo ? 2 : 1) * (excursao ? 4 : 1);
     if (_proximoCliente <= 0 && clientes.length < maxClientes) {
       _proximoCliente = max(0.9, 4.0 - abertas * 0.35 - nivel(Habilidade.marketing) * 0.3) * (0.7 + _rnd.nextDouble() * 0.6);
       final abertasL = barracas.where((b) => b.aberta).toList();
@@ -882,6 +1108,10 @@ class Mundo {
         if (c.estado == EstadoCliente.chegando && c.vaga >= 0) c.estado = EstadoCliente.esperando;
       }
     }
+    for (final c in clientes.where((c) => c.vip && c.estado != EstadoCliente.saindo)) {
+      c.paciencia -= dt;
+      if (c.paciencia <= 0) c.estado = EstadoCliente.saindo; // cansou de esperar
+    }
     clientes.removeWhere((c) => c.estado == EstadoCliente.saindo && (c.x < -0.8 || c.x > larguraMapa + 0.8));
   }
 
@@ -913,6 +1143,7 @@ class Mundo {
     'hab': {for (final e in habilidades.entries) e.key.name: e.value},
     'emp': {for (final e in melhorias.entries) e.key.name: e.value},
     'pagos': pagos,
+    'cid': cidades,
     'bo': {
       for (final e in boosts.entries)
         if (e.value > 0) e.key.name: e.value.roundToDouble(),
@@ -932,9 +1163,10 @@ class Mundo {
     nivelMochila = i(j['mochila'], maxNivelEquip);
     nivelTenis = i(j['tenis'], maxNivelEquip);
     pontosHabilidade = i(j['pontos'], 1000);
-    missao = i(j['missao'], missoes.length);
+    missao = i(j['missao'], missoes.length + 1000);
     boostsUsados = i(j['boosts'], 1 << 20);
     usouComputador = j['pc'] == true;
+    cidades = i(j['cid'], 100);
     final hab = j['hab'];
     for (final h in Habilidade.values) {
       habilidades[h] = hab is Map ? i(hab[h.name], maxHabilidade) : 0;

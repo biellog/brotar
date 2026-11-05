@@ -59,7 +59,11 @@ class Tycoon3dScreen extends StatefulWidget {
   final String? codigoGrupo;
   final bool web;
   final String? nome;
-  const Tycoon3dScreen({super.key, this.codigoGrupo, this.web = false, this.nome});
+
+  /// Só para a prévia visual (tool/preview_jogo.dart): começa com um agito e numa posição.
+  final TipoAgito? agitoPrevia;
+  final (double, double)? posicaoPrevia;
+  const Tycoon3dScreen({super.key, this.codigoGrupo, this.web = false, this.nome, this.agitoPrevia, this.posicaoPrevia});
 
   @override
   State<Tycoon3dScreen> createState() => _Tycoon3dScreenState();
@@ -84,6 +88,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
   final _confetes = <_Confete>[];
   final _poeiras = <_Poeira>[];
   bool _pc = false, _skills = false;
+  double _tremer = 0;
   int _abaPc = 0;
   final _inicio = DateTime.now();
   int _coposNoInicio = 0;
@@ -127,6 +132,12 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
     if (!mounted) return;
     _coposNoInicio = _m.copos;
     _exibido = _m.dinheiro;
+    if (widget.agitoPrevia != null) _m.comecarAgito(widget.agitoPrevia!, []);
+    if (widget.posicaoPrevia != null) {
+      _m.jogador
+        ..x = widget.posicaoPrevia!.$1
+        ..y = widget.posicaoPrevia!.$2;
+    }
     setState(() => _carregado = true);
     _ticker.start();
     if (fora > 60) {
@@ -356,6 +367,37 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
             _pc = true;
           case TipoEvento.poeira:
             _poeiras.add(_Poeira(iso.p(e.x, e.y) + Offset(_rnd.nextDouble() * 10 - 5, 0)));
+          case TipoEvento.combo:
+            final nivel = e.valor < 1.25 ? 0 : (e.valor < 1.45 ? 1 : (e.valor < 1.75 ? 2 : 3));
+            Musica.efeito([Efeito.tyCombo1, Efeito.tyCombo2, Efeito.tyCombo3, Efeito.tyCombo4][nivel]);
+            HapticFeedback.mediumImpact();
+            _textos.add(_Texto(pos - const Offset(0, 40), '🔥 ${e.texto}', const Color(0xFFFF7A3D)));
+            _confete(pos, 12 + nivel * 8);
+          case TipoEvento.agito:
+            Musica.efeito(e.suco == TipoAgito.calor.index ? Efeito.tyCalor : Efeito.tyRush);
+            HapticFeedback.heavyImpact();
+            _tremer = 0.5;
+            _confete(Offset(_tela.width / 2, _tela.height * 0.3), 40);
+            _textos.add(_Texto(Offset(_tela.width / 2, _tela.height * 0.4), e.texto, Colors.white));
+          case TipoEvento.moeda:
+            Musica.efeito(Efeito.tyMoeda);
+            HapticFeedback.selectionClick();
+            _moedas.add(_Moeda(iso.p(e.x, e.y, 0.3)));
+            _textos.add(_Texto(iso.p(e.x, e.y, 0.8), '+${reais3d(e.valor)}', _ouro));
+          case TipoEvento.fruta:
+            Musica.efeito(Efeito.tyBau);
+            HapticFeedback.heavyImpact();
+            _confete(iso.p(e.x, e.y, 0.5), 60);
+            _textos.add(_Texto(iso.p(e.x, e.y, 1.2), e.texto, const Color(0xFFFFE08A)));
+          case TipoEvento.vip:
+            Musica.efeito(Efeito.tyMarco);
+            HapticFeedback.heavyImpact();
+            _confete(pos, 50);
+            _textos.add(_Texto(pos - const Offset(0, 50), '${e.texto}\n+${reais3d(e.valor)}', const Color(0xFFFFE08A)));
+          case TipoEvento.cidade:
+            Musica.efeito(Efeito.tyFilial);
+            HapticFeedback.heavyImpact();
+            _confete(Offset(_tela.width / 2, _tela.height / 2), 90);
         }
       }
     }
@@ -365,6 +407,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
     if (_moedas.any((mo) => mo.t >= 1)) _pulso = 1;
     _moedas.removeWhere((mo) => mo.t >= 1);
     _pulso = max(0, _pulso - dt * 4);
+    _tremer = max(0, _tremer - dt);
     _exibido += (_m.dinheiro - _exibido) * min(1, dt * 8);
     if ((_m.dinheiro - _exibido).abs() < 0.05) _exibido = _m.dinheiro;
     for (final tx in _textos) {
@@ -564,6 +607,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                           convidar: _convidarGrupo,
                         ),
                       _BarraBoosts(m: _m),
+                      if (_m.agito != null) _BannerAgito(m: _m, tremer: _tremer),
                       const Spacer(),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 14),
@@ -580,6 +624,12 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                           ],
                         ),
                       ),
+                      if (_m.combo >= 2) _MedidorCombo(m: _m),
+                      if (_m.cidades > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _Etiqueta('🏙️ ${nomeCidade(_m.cidades)} · +${50 * _m.cidades}% em tudo', _ouro),
+                        ),
                       if (_t < 8 && _m.copos == 0)
                         const Padding(
                           padding: EdgeInsets.only(bottom: 18),
@@ -1049,6 +1099,38 @@ class _Computador extends StatelessWidget {
           ),
       ],
       1 => [
+        _Linha(
+          emoji: '🌎',
+          titulo: 'Cidade nova: ${nomeCidade(m.cidades + 1)}',
+          sub: m.podeNovaCidade
+              ? 'Recomeça as barracas e o dinheiro, mas TUDO passa a valer +${50 * (m.cidades + 1)}% para sempre. '
+                    'Habilidades, empresa e equipamentos continuam.'
+              : 'Abra as 8 barracas para poder mudar de cidade (bônus de +50% para sempre).',
+          preco: m.podeNovaCidade ? 'Mudar!' : '${m.abertas}/${sucos.length} 🏪',
+          pode: m.podeNovaCidade,
+          aoTocar: () async {
+            if (!m.podeNovaCidade) return comprou(false);
+            final ok = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text('🌎 Mudar para ${nomeCidade(m.cidades + 1)}?'),
+                content: const Text(
+                  'As barracas e o dinheiro recomeçam do zero, mas todos os sucos passam a valer '
+                  '+50% a mais para sempre. Habilidades, melhorias da empresa e equipamentos continuam.',
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Agora não')),
+                  FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: const Size(100, 44)),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Mudar!'),
+                  ),
+                ],
+              ),
+            );
+            if (ok == true) comprou(executar('cidade', ''));
+          },
+        ),
         for (final e in Melhoria.values)
           _Linha(
             emoji: e.emoji,
@@ -1292,6 +1374,96 @@ class _FaixaGrupo extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _BannerAgito extends StatelessWidget {
+  final Mundo m;
+  final double tremer;
+  const _BannerAgito({required this.m, required this.tremer});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = m.agito!;
+    final dx = tremer > 0 ? sin(tremer * 60) * 6 * tremer : 0.0;
+    final vip = m.clientes.where((c) => c.vip && c.estado != EstadoCliente.saindo).firstOrNull;
+    final dica = switch (a) {
+      TipoAgito.moedas => '${a.descricao} (${m.moedasChao.length} restando)',
+      TipoAgito.vip when vip != null => 'Quer ${vip.faltam}x ${sucos[vip.quer].emoji} ${sucos[vip.quer].nome} · paga 5x!',
+      _ => a.descricao,
+    };
+    return Transform.translate(
+      offset: Offset(dx, 0),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFFFF4D6D), Color(0xFFFF9F1C)]),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [BoxShadow(color: Color(0x66FF4D6D), blurRadius: 12)],
+        ),
+        child: Row(
+          children: [
+            Text(a.emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    a.nome,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                  ),
+                  Text(dica, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                ],
+              ),
+            ),
+            Text(
+              '${m.agitoResta.ceil()}s',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MedidorCombo extends StatelessWidget {
+  final Mundo m;
+  const _MedidorCombo({required this.m});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Container(
+      width: 190,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFF7A3D), width: 2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '🔥 COMBO ${m.combo} · x${m.multCombo.toStringAsFixed(1)}',
+            style: const TextStyle(color: Color(0xFFFFB38A), fontWeight: FontWeight.w900, fontSize: 15),
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (m.comboTempo / Mundo.tempoCombo).clamp(0, 1),
+              minHeight: 5,
+              backgroundColor: Colors.white24,
+              valueColor: const AlwaysStoppedAnimation(Color(0xFFFF7A3D)),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

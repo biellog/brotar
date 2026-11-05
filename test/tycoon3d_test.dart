@@ -44,7 +44,7 @@ void main() {
     final m = Mundo(Random(1))..dinheiro = 100;
     final placa = m.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
     irPara(m, placa.x, placa.y);
-    esperar(m, 2);
+    esperar(m, esperaPlaca + 2);
     expect(m.barracas[1].aberta, isTrue);
     final antes = (m.jogador.x, m.jogador.y);
     irPara(m, 9, 7, maxSeg: 4); // consegue sair andando
@@ -78,7 +78,7 @@ void main() {
     final m = Mundo(Random(1))..dinheiro = 15;
     final placa = m.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
     irPara(m, placa.x, placa.y);
-    esperar(m, 2);
+    esperar(m, esperaPlaca + 2);
     expect(m.dinheiro, 0);
     expect(m.barracas[1].aberta, isFalse);
     expect(m.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir).pago, closeTo(15, 0.01));
@@ -218,7 +218,7 @@ void main() {
     expect(n.dinheiro, 0);
     expect(n.ajudantes.length, Mundo.custosAjudante.length);
     expect(n.nivel(Habilidade.forca), maxHabilidade);
-    expect(n.missao, missoes.length);
+    expect(n.missao, lessThanOrEqualTo(missoes.length + 1000));
     expect(n.barracas[0].aberta, isTrue);
     expect(n.barracas[0].estoque, lessThanOrEqualTo(n.capacidadeBarraca(n.barracas[0])));
   });
@@ -231,5 +231,163 @@ void main() {
       final cos = (mov.dx * tx + mov.dy * ty) / (mov.distance * Offset(tx, ty).distance);
       expect(cos, greaterThan(0.99));
     }
+  });
+
+  test('placa só começa a cobrar depois de 5 s parado em cima', () {
+    final m = Mundo(Random(1))..dinheiro = 100;
+    final placa = m.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
+    irPara(m, placa.x, placa.y);
+    esperar(m, esperaPlaca - 0.5);
+    expect(m.dinheiro, 100); // ainda não cobrou
+    expect(m.jogador.naPlaca, greaterThan(3));
+    irPara(m, 9, 7); // saiu: o tempo zera
+    expect(m.jogador.naPlaca, 0);
+    irPara(m, placa.x, placa.y);
+    esperar(m, 2);
+    expect(m.dinheiro, 100); // contou de novo do zero
+    esperar(m, 5);
+    expect(m.barracas[1].aberta, isTrue);
+  });
+
+  test('combo: vender seguido aumenta o preço (até x2) e zera se demorar', () {
+    final m = Mundo(Random(1));
+    expect(m.multCombo, 1);
+    m
+      ..combo = 6
+      ..comboTempo = 1;
+    expect(m.multCombo, closeTo(1.5, 1e-9));
+    m.combo = 50;
+    expect(m.multCombo, closeTo(2, 1e-9));
+    esperar(m, Mundo.tempoCombo + 0.5);
+    expect(m.combo, 0);
+  });
+
+  test('vendas em sequência fazem combo de verdade', () {
+    final m = Mundo(Random(1));
+    final c1 = Cliente(vagasBase[0].$1, vagasBase[0].$2, 0, 3, 0)
+      ..estado = EstadoCliente.esperando
+      ..vaga = 0;
+    m.clientes.add(c1);
+    m.jogador
+      ..x = 8
+      ..y = balcao.y + balcao.d + 0.5
+      ..carga.addAll([0, 0, 0]);
+    final ev = <Evento>[];
+    for (var k = 0; k < 20; k++) {
+      ev.addAll(m.passo(0.05, 0, 0));
+    }
+    expect(m.copos, 3);
+    expect(m.combo, 3);
+    expect(ev.any((e) => e.tipo == TipoEvento.combo), isTrue);
+    expect(m.dinheiro, greaterThan(3 * m.preco(m.barracas[0])));
+  });
+
+  test('agitos aparecem sozinhos depois de um tempo', () {
+    final m = Mundo(Random(4))..copos = 10;
+    final ev = <Evento>[];
+    for (var t = 0.0; t < 80; t += 0.05) {
+      ev.addAll(m.passo(0.05, 0, 0));
+    }
+    expect(ev.any((e) => e.tipo == TipoEvento.agito), isTrue);
+  });
+
+  test('chuva de moedas: passar por cima pega o dinheiro', () {
+    final m = Mundo(Random(1))..copos = 10;
+    m.comecarAgito(TipoAgito.moedas, []);
+    expect(m.moedasChao, isNotEmpty);
+    final mo = m.moedasChao.first;
+    m.jogador
+      ..x = mo.x
+      ..y = mo.y;
+    final ev = m.passo(0.016, 0, 0);
+    expect(ev.any((e) => e.tipo == TipoEvento.moeda), isTrue);
+    expect(m.dinheiro, greaterThanOrEqualTo(mo.valor));
+  });
+
+  test('fruta dourada enche as barracas e liga produção x2', () {
+    final m = Mundo(Random(1));
+    m.comecarAgito(TipoAgito.fruta, []);
+    final f = m.fruta!;
+    m.jogador
+      ..x = f.$1
+      ..y = f.$2;
+    m.passo(0.016, 0, 0);
+    expect(m.fruta, isNull);
+    expect(m.barracas[0].estoque, m.capacidadeBarraca(m.barracas[0]));
+    expect(m.ativo(Boost.producao), isTrue);
+  });
+
+  test('onda de calor: suco vale +50% só enquanto dura', () {
+    final m = Mundo(Random(1));
+    final p = m.preco(m.barracas[0]);
+    m.comecarAgito(TipoAgito.calor, []);
+    expect(m.preco(m.barracas[0]), closeTo(p * 1.5, 1e-9));
+    esperar(m, TipoAgito.calor.duracao + 1);
+    expect(m.agito, isNull);
+    expect(m.preco(m.barracas[0]), closeTo(p, 1e-9));
+  });
+
+  test('cliente VIP paga 5x e vai embora se esperar demais', () {
+    final m = Mundo(Random(1));
+    m.barracas[1].aberta = true;
+    m.comecarAgito(TipoAgito.vip, []);
+    final vip = m.clientes.singleWhere((c) => c.vip);
+    expect(vip.quer, 1);
+    esperar(m, TipoAgito.vip.duracao + 1);
+    expect(vip.estado, EstadoCliente.saindo);
+    expect(m.agito, isNull);
+  });
+
+  test('excursão traz muito mais cliente', () {
+    final a = Mundo(Random(1)), b = Mundo(Random(1));
+    b.comecarAgito(TipoAgito.excursao, []);
+    var maxA = 0, maxB = 0;
+    for (var t = 0.0; t < 15; t += 0.05) {
+      a.passo(0.05, 0, 0);
+      b.passo(0.05, 0, 0);
+      maxA = max(maxA, a.clientes.length);
+      maxB = max(maxB, b.clientes.length);
+    }
+    expect(maxB, greaterThan(maxA));
+  });
+
+  test('cidade nova: só com as 8 barracas, recomeça com +50% para sempre', () {
+    final m = Mundo(Random(1))..dinheiro = 9e9;
+    expect(m.novaCidade(), isFalse);
+    for (final b in m.barracas) {
+      b
+        ..aberta = true
+        ..nivel = 5;
+    }
+    m.subirHabilidade(Habilidade.forca); // sem pontos, não sobe
+    m.pontosHabilidade = 2;
+    m.subirHabilidade(Habilidade.forca);
+    m.comprarMelhoria(Melhoria.logo);
+    final base = m.barracas[0].precoBase;
+    expect(m.executar('cidade', ''), isTrue);
+    expect(m.cidades, 1);
+    expect(m.dinheiro, 0);
+    expect(m.abertas, 1);
+    expect(m.barracas[0].nivel, 1);
+    expect(m.nivel(Habilidade.forca), 1); // habilidades ficam
+    expect(m.nivelMelhoria(Melhoria.logo), 1); // empresa fica
+    expect(m.preco(m.barracas[0]), closeTo(m.barracas[0].precoBase * 1.1 * 1.5, 1e-9));
+    expect(base, greaterThan(m.barracas[0].precoBase));
+    final n = Mundo(Random(2))..carregar(m.paraJson(DateTime.now()), DateTime.now());
+    expect(n.cidades, 1);
+    expect(nomeCidade(1), 'Vila do Sol');
+  });
+
+  test('missões nunca acabam', () {
+    final m = Mundo(Random(1))..missao = missoes.length;
+    final a = m.missaoAtual!;
+    m.missao++;
+    final b = m.missaoAtual!;
+    m.missao++;
+    final c = m.missaoAtual!;
+    expect({a.tipo, b.tipo, c.tipo}, {TipoMissao.copos, TipoMissao.faturar, TipoMissao.cidade});
+    expect(a.premio, greaterThan(0));
+    m.missao += 300;
+    expect(m.missaoAtual, isNotNull);
   });
 }

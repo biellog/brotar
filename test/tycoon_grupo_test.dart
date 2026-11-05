@@ -64,7 +64,7 @@ void main() {
       ..dinheiro = 100;
     final placa = host.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
     host.atualizarAmigo('amigo1', {'x': placa.x, 'y': placa.y});
-    esperar(host, 3);
+    esperar(host, esperaPlaca + 3);
     expect(host.barracas[1].aberta, isTrue);
   });
 
@@ -110,7 +110,7 @@ void main() {
       ..dinheiro = 100;
     final placa = host.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
     host.atualizarAmigo('amigo1', {'x': placa.x, 'y': placa.y});
-    esperar(host, 3);
+    esperar(host, esperaPlaca + 3);
     final eu = Mundo(Random(2))
       ..grupo = true
       ..espelho = true;
@@ -191,5 +191,40 @@ void main() {
     expect(linkImperio('K7Q2PMNX'), endsWith('/jogar/?suco=K7Q2PMNX'));
     expect(mensagemConviteImperio('K7Q2PMNX', 'Galera'), contains('\nK7Q2PMNX'));
     expect(gerarIdLocal().length, 11);
+  });
+
+  test('agito, moedas, combo e VIP também chegam no amigo', () {
+    final host = Mundo(Random(1))..grupo = true;
+    host.barracas[1].aberta = true;
+    host.atualizarAmigo('amigo1', {'x': 9, 'y': 7});
+    host.comecarAgito(TipoAgito.moedas, []);
+    host
+      ..combo = 4
+      ..comboTempo = 2;
+    final eu = Mundo(Random(2))
+      ..grupo = true
+      ..espelho = true;
+    eu.aplicarAoVivo(pelaRede(host.estadoAoVivo('dono', 'Bia', coresAmigos[0])), 'amigo1');
+    expect(eu.agito, TipoAgito.moedas);
+    expect(eu.moedasChao.length, host.moedasChao.length);
+    expect(eu.combo, 4);
+    host.comecarAgito(TipoAgito.vip, []);
+    eu.aplicarAoVivo(pelaRede(host.estadoAoVivo('dono', 'Bia', coresAmigos[0])), 'amigo1');
+    expect(eu.agito, TipoAgito.vip);
+    expect(eu.clientes.where((c) => c.vip), hasLength(1));
+    expect(eu.moedasChao, isEmpty);
+  });
+
+  test('o tempo de 5 s da placa aparece também para o amigo', () {
+    final eu = Mundo(Random(2))
+      ..grupo = true
+      ..espelho = true;
+    final placa = eu.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
+    eu.jogador
+      ..x = placa.x
+      ..y = placa.y;
+    esperar(eu, 2);
+    expect(eu.jogador.placaAtual, placa.id);
+    expect(eu.jogador.naPlaca, closeTo(2, 0.1));
   });
 }
