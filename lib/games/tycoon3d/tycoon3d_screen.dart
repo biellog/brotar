@@ -89,6 +89,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
   final _poeiras = <_Poeira>[];
   bool _pc = false, _skills = false;
   double _tremer = 0;
+  Area _areaAtual = Area.praca;
   int _abaPc = 0;
   final _inicio = DateTime.now();
   int _coposNoInicio = 0;
@@ -268,6 +269,69 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
     } catch (_) {}
   }
 
+  void _abrirGrupo() {
+    final c = _codigo;
+    if (c == null) return;
+    final nomes = [for (final p in _rede?.presentes.values ?? const <Presente>[]) p.nome];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF14213D),
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '👥 $_nomeImperio',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                nomes.isEmpty ? 'Só você por enquanto' : 'Online: ${nomes.join(', ')}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: _copiarCodigo,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _ouro),
+                  ),
+                  child: Text(
+                    '📋 $c',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: _ouro, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Toque no código para copiar',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1FAF7A)),
+                onPressed: _convidarGrupo,
+                icon: const Icon(Icons.share),
+                label: const Text('Convidar amigos (link)', style: TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _copiarCodigo() {
     final c = _codigo;
     if (c == null) return;
@@ -394,6 +458,34 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
             HapticFeedback.heavyImpact();
             _confete(pos, 50);
             _textos.add(_Texto(pos - const Offset(0, 50), '${e.texto}\n+${reais3d(e.valor)}', const Color(0xFFFFE08A)));
+          case TipoEvento.area:
+            Musica.efeito(Efeito.tyFilial);
+            HapticFeedback.heavyImpact();
+            _confete(pos, 70);
+            _textos.add(_Texto(Offset(_tela.width / 2, _tela.height * 0.38), '🔓 ${e.texto}', Colors.white));
+            _salvar();
+          case TipoEvento.colheu:
+            if (_t - _ultimoSomPegar > 0.12) {
+              _ultimoSomPegar = _t;
+              Musica.efeito(Efeito.plantar);
+              HapticFeedback.selectionClick();
+            }
+          case TipoEvento.frutas:
+            Musica.efeito(Efeito.tyCaixa);
+            HapticFeedback.mediumImpact();
+            _confete(pos, 25);
+            _textos.add(_Texto(pos - const Offset(0, 30), e.texto, const Color(0xFFB9F6CA)));
+          case TipoEvento.pedidoNovo:
+            Musica.efeito(Efeito.tyGema);
+            _textos.add(_Texto(Offset(_tela.width / 2, _tela.height * 0.4), e.texto, Colors.white));
+          case TipoEvento.pedido:
+            Musica.efeito(Efeito.tyMarco);
+            HapticFeedback.heavyImpact();
+            _confete(pos, 40);
+            _textos.add(_Texto(pos - const Offset(0, 40), '${e.texto}\n+${reais3d(e.valor)}', _ouro));
+            for (var k = 0; k < 5; k++) {
+              _moedas.add(_Moeda(pos + Offset(_rnd.nextDouble() * 30 - 15, _rnd.nextDouble() * 10))..t = -k * 0.06);
+            }
           case TipoEvento.cidade:
             Musica.efeito(Efeito.tyFilial);
             HapticFeedback.heavyImpact();
@@ -408,6 +500,13 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
     _moedas.removeWhere((mo) => mo.t >= 1);
     _pulso = max(0, _pulso - dt * 4);
     _tremer = max(0, _tremer - dt);
+    final area = areaDe(_m.jogador.x, _m.jogador.y);
+    if (area != _areaAtual) {
+      _areaAtual = area;
+      if (_t > 1 && _tela != Size.zero) {
+        _textos.add(_Texto(Offset(_tela.width / 2, _tela.height * 0.3), '📍 ${area.emoji} ${area.nome}', Colors.white));
+      }
+    }
     _exibido += (_m.dinheiro - _exibido) * min(1, dt * 8);
     if ((_m.dinheiro - _exibido).abs() < 0.05) _exibido = _m.dinheiro;
     for (final tx in _textos) {
@@ -589,47 +688,46 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                               ),
                             ),
                             const Spacer(),
+                            if (_grupo) ...[
+                              _BotaoGrupo(
+                                conectado: _rede?.conectado ?? false,
+                                online: max(1, _rede?.presentes.length ?? 1),
+                                aoTocar: _abrirGrupo,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
                             _BotaoSkills(pontos: _m.pontosHabilidade, aoTocar: () => setState(() => _skills = true)),
                             const SizedBox(width: 6),
                             const _FundoBotaoMusica(),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      _BannerMissao(m: _m),
-                      if (_grupo)
-                        _FaixaGrupo(
-                          nome: _nomeImperio,
-                          codigo: _codigo!,
-                          online: max(1, _rede?.presentes.length ?? 1),
-                          conectado: _rede?.conectado ?? false,
-                          copiar: _copiarCodigo,
-                          convidar: _convidarGrupo,
-                        ),
-                      _BarraBoosts(m: _m),
-                      if (_m.agito != null) _BannerAgito(m: _m, tremer: _tremer),
+                      const SizedBox(height: 6),
+                      _MissaoCompacta(m: _m),
+                      _Pilulas(m: _m, tremer: _tremer),
                       const Spacer(),
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            _Etiqueta('🥤 $carga/${_m.capacidade}', carga >= _m.capacidade ? _ouro : Colors.white),
-                            const SizedBox(width: 8),
-                            _grupo
-                                ? _Etiqueta('👥 ${1 + _m.amigos.length}', Colors.white)
-                                : _Etiqueta('🧑‍🍳 ${_m.ajudantes.length}', Colors.white),
-                            const SizedBox(width: 8),
-                            _Etiqueta('🏪 ${_m.abertas}/${sucos.length}', Colors.white),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _Etiqueta('🥤 $carga/${_m.capacidade}', carga >= _m.capacidade ? _ouro : Colors.white),
+                                  _grupo
+                                      ? _Etiqueta('👥 ${1 + _m.amigos.length}', Colors.white)
+                                      : _Etiqueta('🧑‍🍳 ${_m.ajudantes.length}', Colors.white),
+                                  _Etiqueta('🏪 ${_m.abertas}/${sucos.length}', Colors.white),
+                                ],
+                              ),
+                            ),
+                            _MiniMapa(m: _m, t: _t),
                           ],
                         ),
                       ),
-                      if (_m.combo >= 2) _MedidorCombo(m: _m),
-                      if (_m.cidades > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _Etiqueta('🏙️ ${nomeCidade(_m.cidades)} · +${50 * _m.cidades}% em tudo', _ouro),
-                        ),
                       if (_t < 8 && _m.copos == 0)
                         const Padding(
                           padding: EdgeInsets.only(bottom: 18),
@@ -785,96 +883,6 @@ class _PintorEfeitos extends CustomPainter {
 }
 
 // ---------------- HUD: missão, boosts e habilidades ----------------
-class _BannerMissao extends StatelessWidget {
-  final Mundo m;
-  const _BannerMissao({required this.m});
-
-  @override
-  Widget build(BuildContext context) {
-    final mi = m.missaoAtual;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _ouro.withValues(alpha: 0.6)),
-      ),
-      child: mi == null
-          ? const Text(
-              '🏆 Você completou todas as missões! Agora é crescer o império.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-            )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '🎯 ${m.missao + 1}/${missoes.length}',
-                      style: const TextStyle(color: _ouro, fontWeight: FontWeight.w900, fontSize: 12),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        mi.texto,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                      ),
-                    ),
-                    Text(
-                      '${reais3d(mi.premio)} +1⭐',
-                      style: const TextStyle(color: Color(0xFFFFE08A), fontWeight: FontWeight.w800, fontSize: 12),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: m.progressoMissao,
-                    minHeight: 7,
-                    backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation(_ouro),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-}
-
-class _BarraBoosts extends StatelessWidget {
-  final Mundo m;
-  const _BarraBoosts({required this.m});
-
-  @override
-  Widget build(BuildContext context) {
-    final ativos = Boost.values.where(m.ativo).toList();
-    if (ativos.isEmpty) return const SizedBox(height: 4);
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Wrap(
-        spacing: 6,
-        children: [
-          for (final b in ativos)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF7B2FF7), Color(0xFFF107A3)]),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${b.emoji} ${m.boosts[b]!.ceil()}s',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _BotaoSkills extends StatelessWidget {
   final int pontos;
   final VoidCallback aoTocar;
@@ -1324,146 +1332,227 @@ class _Computador extends StatelessWidget {
   }
 }
 
-class _FaixaGrupo extends StatelessWidget {
-  final String nome, codigo;
-  final int online;
-  final bool conectado;
-  final VoidCallback copiar, convidar;
-  const _FaixaGrupo({
-    required this.nome,
-    required this.codigo,
-    required this.online,
-    required this.conectado,
-    required this.copiar,
-    required this.convidar,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(color: const Color(0xCC1E3A6E), borderRadius: BorderRadius.circular(14)),
-    child: Row(
-      children: [
-        Icon(Icons.circle, size: 9, color: conectado ? const Color(0xFF7BD389) : Colors.white38),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            '👥 $nome · $online online',
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
-          ),
-        ),
-        GestureDetector(
-          onTap: copiar,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(8)),
-            child: Text(
-              '📋 $codigo',
-              style: const TextStyle(color: _ouro, fontSize: 12, fontWeight: FontWeight.w900),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: convidar,
-          child: const Text(
-            'Convidar ↗',
-            style: TextStyle(color: _ouro, fontSize: 12, fontWeight: FontWeight.w900),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _BannerAgito extends StatelessWidget {
+/// Missão numa linha só (com barrinha de progresso).
+class _MissaoCompacta extends StatelessWidget {
   final Mundo m;
-  final double tremer;
-  const _BannerAgito({required this.m, required this.tremer});
+  const _MissaoCompacta({required this.m});
 
   @override
   Widget build(BuildContext context) {
-    final a = m.agito!;
-    final dx = tremer > 0 ? sin(tremer * 60) * 6 * tremer : 0.0;
-    final vip = m.clientes.where((c) => c.vip && c.estado != EstadoCliente.saindo).firstOrNull;
-    final dica = switch (a) {
-      TipoAgito.moedas => '${a.descricao} (${m.moedasChao.length} restando)',
-      TipoAgito.vip when vip != null => 'Quer ${vip.faltam}x ${sucos[vip.quer].emoji} ${sucos[vip.quer].nome} · paga 5x!',
-      _ => a.descricao,
-    };
-    return Transform.translate(
-      offset: Offset(dx, 0),
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFFFF4D6D), Color(0xFFFF9F1C)]),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [BoxShadow(color: Color(0x66FF4D6D), blurRadius: 12)],
-        ),
-        child: Row(
-          children: [
-            Text(a.emoji, style: const TextStyle(fontSize: 24)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    a.nome,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
-                  ),
-                  Text(dica, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                ],
+    final mi = m.missaoAtual;
+    if (mi == null) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(10, 5, 10, 6),
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Text('🎯 ', style: TextStyle(fontSize: 13)),
+              Expanded(
+                child: Text(
+                  mi.texto,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                ),
               ),
+              Text(
+                ' ${reais3d(mi.premio)} +1⭐',
+                style: const TextStyle(color: Color(0xFFFFE08A), fontWeight: FontWeight.w800, fontSize: 11),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: m.progressoMissao,
+              minHeight: 4,
+              backgroundColor: Colors.white24,
+              valueColor: const AlwaysStoppedAnimation(_ouro),
             ),
-            Text(
-              '${m.agitoResta.ceil()}s',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _MedidorCombo extends StatelessWidget {
+/// Tudo o que está acontecendo agora, em pílulas pequenas numa linha (sem tampar a tela).
+class _Pilulas extends StatelessWidget {
   final Mundo m;
-  const _MedidorCombo({required this.m});
+  final double tremer;
+  const _Pilulas({required this.m, required this.tremer});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Container(
-      width: 190,
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFF7A3D), width: 2),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '🔥 COMBO ${m.combo} · x${m.multCombo.toStringAsFixed(1)}',
-            style: const TextStyle(color: Color(0xFFFFB38A), fontWeight: FontWeight.w900, fontSize: 15),
+  Widget build(BuildContext context) {
+    final area = areaDe(m.jogador.x, m.jogador.y);
+    final a = m.agito;
+    final vip = m.clientes.where((c) => c.vip && c.estado != EstadoCliente.saindo).firstOrNull;
+    final pe = m.pedido;
+    final itens = <Widget>[
+      _Pilula('📍 ${area.emoji} ${area.nome}${m.cidades > 0 ? ' · +${50 * m.cidades}%' : ''}', const [
+        Color(0xCC263238),
+        Color(0xCC37474F),
+      ]),
+      if (a != null)
+        Transform.translate(
+          offset: Offset(tremer > 0 ? sin(tremer * 60) * 5 * tremer : 0, 0),
+          child: _Pilula(
+            switch (a) {
+              TipoAgito.vip when vip != null => '👑 ${vip.faltam}x ${sucos[vip.quer].emoji} · ${m.agitoResta.ceil()}s',
+              TipoAgito.moedas => '🪙 ${m.moedasChao.length} moedas · ${m.agitoResta.ceil()}s',
+              _ => '${a.emoji} ${a.nome.replaceAll('!', '')} · ${m.agitoResta.ceil()}s',
+            },
+            const [Color(0xFFFF4D6D), Color(0xFFFF9F1C)],
           ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: (m.comboTempo / Mundo.tempoCombo).clamp(0, 1),
-              minHeight: 5,
-              backgroundColor: Colors.white24,
-              valueColor: const AlwaysStoppedAnimation(Color(0xFFFF7A3D)),
-            ),
-          ),
-        ],
-      ),
+        ),
+      for (final b in Boost.values.where(m.ativo))
+        _Pilula('${b.emoji} ${m.boosts[b]!.ceil()}s', const [Color(0xFF7B2FF7), Color(0xFFF107A3)]),
+      if (m.combo >= 2)
+        _Pilula('🔥 x${m.multCombo.toStringAsFixed(1)}', [
+          const Color(0xFFFF7A3D).withValues(alpha: 0.5 + 0.5 * (m.comboTempo / Mundo.tempoCombo).clamp(0, 1)),
+          const Color(0xFFFF4D00),
+        ]),
+      if (pe != null)
+        _Pilula(
+          '📦 ${pe.qtd}${sucos[pe.suco].emoji} → ${destinosParque[pe.destino].$1} ${destinosParque[pe.destino].$2} · ${pe.resta.ceil()}s',
+          const [Color(0xFF00897B), Color(0xFF26A69A)],
+        ),
+      if (m.jogador.frutas > 0)
+        _Pilula('🧺 ${m.jogador.frutas}/${m.capacidadeCesta} → depósito', const [Color(0xFF2E7D32), Color(0xFF66BB6A)]),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      child: Wrap(alignment: WrapAlignment.center, spacing: 5, runSpacing: 5, children: itens),
+    );
+  }
+}
+
+class _Pilula extends StatelessWidget {
+  final String texto;
+  final List<Color> cores;
+  const _Pilula(this.texto, this.cores);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(colors: cores),
+      borderRadius: BorderRadius.circular(11),
+    ),
+    child: Text(
+      texto,
+      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
     ),
   );
+}
+
+class _BotaoGrupo extends StatelessWidget {
+  final bool conectado;
+  final int online;
+  final VoidCallback aoTocar;
+  const _BotaoGrupo({required this.conectado, required this.online, required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      Material(
+        color: Colors.black38,
+        shape: const CircleBorder(),
+        child: IconButton(
+          icon: const Icon(Icons.group, color: Colors.white),
+          tooltip: 'Império em grupo',
+          onPressed: aoTocar,
+        ),
+      ),
+      Positioned(
+        right: -2,
+        top: -2,
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(color: conectado ? const Color(0xFF1FAF7A) : Colors.grey, shape: BoxShape.circle),
+          child: Text(
+            '$online',
+            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+/// Mapa pequeno do mundo (as 4 áreas, você, amigos, pedido e depósito).
+class _MiniMapa extends StatelessWidget {
+  final Mundo m;
+  final double t;
+  const _MiniMapa({required this.m, required this.t});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 112,
+    height: 64,
+    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(12)),
+    child: CustomPaint(painter: _PintorMiniMapa(m, t)),
+  );
+}
+
+class _PintorMiniMapa extends CustomPainter {
+  final Mundo m;
+  final double t;
+  _PintorMiniMapa(this.m, this.t);
+
+  static const _cores = {
+    Area.praca: Color(0xFFF2E3C6),
+    Area.pomar: Color(0xFF7CC66B),
+    Area.praia: Color(0xFFF5DEB3),
+    Area.parque: Color(0xFFB98CF0),
+  };
+
+  @override
+  void paint(Canvas c, Size s) {
+    final k = (s.width - 12) / (larguraMapa * 2);
+    Offset p(double x, double y) => Offset(s.width / 2 + (x - y) * k, 4 + (x + y) * k / 2);
+    for (final a in Area.values) {
+      final cor = m.aberta(a) ? _cores[a]! : const Color(0xFF616161);
+      c.drawPath(
+        Path()..addPolygon([p(a.x0, a.y0), p(a.x1, a.y0), p(a.x1, a.y1), p(a.x0, a.y1)], true),
+        Paint()..color = cor.withValues(alpha: 0.9),
+      );
+      if (!m.aberta(a)) {
+        final tp = TextPainter(
+          text: const TextSpan(text: '🔒', style: TextStyle(fontSize: 9)),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(c, p((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2) - Offset(tp.width / 2, tp.height / 2));
+      }
+    }
+    if (m.aberta(Area.praia)) {
+      c.drawPath(
+        Path()..addPolygon([p(marX, 2), p(larguraMapa, 2), p(larguraMapa, 16.25), p(marX, 16.25)], true),
+        Paint()..color = const Color(0xFF4FC3F7),
+      );
+    }
+    final brilho = 0.5 + 0.5 * sin(t * 6);
+    final pe = m.pedido;
+    if (pe != null) {
+      final d = destinosParque[pe.destino];
+      c.drawCircle(p(d.$3, d.$4), 3 + 2 * brilho, Paint()..color = const Color(0xFF26A69A));
+    }
+    if (m.jogador.frutas > 0) {
+      c.drawCircle(p(depositoFrutas.x, depositoFrutas.y), 3 + 2 * brilho, Paint()..color = const Color(0xFF2E7D32));
+    }
+    for (final a in m.amigos.values) {
+      c.drawCircle(p(a.x, a.y), 2.6, Paint()..color = Color(a.cor));
+    }
+    c.drawCircle(p(m.jogador.x, m.jogador.y), 3.4, Paint()..color = Colors.white);
+    c.drawCircle(p(m.jogador.x, m.jogador.y), 2.4, Paint()..color = const Color(0xFFFF9F1C));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => true;
 }

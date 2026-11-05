@@ -227,4 +227,23 @@ void main() {
     expect(eu.jogador.placaAtual, placa.id);
     expect(eu.jogador.naPlaca, closeTo(2, 0.1));
   });
+
+  test('pomar, pedido e banhistas também chegam no amigo', () {
+    final host = Mundo(Random(1))
+      ..grupo = true
+      ..areas.addAll(Area.values);
+    host.frutasArvore[2] = 0;
+    host.atualizarAmigo('amigo1', {'x': 9, 'y': 7});
+    host.amigos['amigo1']!.frutas = 4;
+    esperar(host, 6);
+    final eu = Mundo(Random(2))
+      ..grupo = true
+      ..espelho = true;
+    eu.aplicarAoVivo(pelaRede(host.estadoAoVivo('dono', 'Bia', coresAmigos[0])), 'amigo1');
+    expect(eu.areas, host.areas);
+    expect(eu.frutasArvore[2], host.frutasArvore[2]);
+    expect(eu.jogador.frutas, 4);
+    expect(eu.pedido?.destino, host.pedido?.destino);
+    expect(eu.clientes.where((c) => c.praia).length, host.clientes.where((c) => c.praia).length);
+  });
 }

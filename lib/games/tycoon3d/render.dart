@@ -65,13 +65,17 @@ class PintorMundo extends CustomPainter {
 
   static const _arvores = [
     (0.5, 2.9), (0.5, 9.5), (0.5, 14.5), // atrás das barracas (fundo)
-    (15.3, 4.5), (15.3, 8.0), (15.4, 10.6), (5.0, 15.4), (8.4, 15.4), (10.6, 15.4),
+    (17.6, 23.2), (30.6, 30.6), (25.0, 31.0), (17.6, 31.0), (30.8, 22.6), (24.6, 18.0), // parque
   ];
-  static const _postes = [(5.2, 2.8), (12.2, 2.8), (6.2, 10.4), (14.8, 6.4)];
+  static const _postes = [(5.2, 2.8), (12.2, 2.8), (6.2, 10.4), (18.0, 2.8), (26.0, 2.8)];
+  static const _coqueiros = [(18.0, 12.4), (24.4, 13.6), (26.8, 6.4), (19.0, 8.6), (27.2, 11.0)];
+  static const _guardasSol = [(25.0, 9.0), (22.0, 11.2), (21.0, 14.2)];
+  Size _tam = Size.zero;
 
   @override
   void paint(Canvas c, Size s) {
     _iso = isoPara(s, m);
+    _tam = s;
     _rotulos.clear();
     c.drawRect(
       Offset.zero & s,
@@ -108,6 +112,52 @@ class PintorMundo extends CustomPainter {
     for (final (x, y) in _postes) {
       lista.add(_Desenho(x + y, (c) => _poste(c, x, y)));
     }
+    void add(double x, double y, double prof, void Function(Canvas) f) {
+      if (_naTela(_iso.p(x, y), 4)) lista.add(_Desenho(prof, f));
+    }
+
+    if (m.aberta(Area.praia)) {
+      for (final (x, y) in _coqueiros) {
+        add(x, y, x + y, (c) => _coqueiro(c, x, y));
+      }
+      for (final (x, y) in _guardasSol) {
+        add(x, y, x + y, (c) => _guardaSol(c, x, y));
+      }
+      add(quiosque.x, quiosque.y, quiosque.x + quiosque.w / 2 + quiosque.y + quiosque.d / 2 + 0.3, _quiosque);
+    }
+    if (m.aberta(Area.pomar)) {
+      for (var k = 0; k < arvoresPomar.length; k++) {
+        final (x, y) = arvoresPomar[k];
+        add(x, y, x + y, (c) => _arvoreFruta(c, x, y, m.frutasArvore[k]));
+      }
+      add(depositoFrutas.x, depositoFrutas.y, depositoFrutas.x + depositoFrutas.y, _deposito);
+    }
+    final parque = m.aberta(Area.parque);
+    add(rodaGigante.x, rodaGigante.y, rodaGigante.x + rodaGigante.w / 2 + rodaGigante.y + rodaGigante.d / 2, (c) {
+      // fechado: a roda-gigante aparece apagada, só para dar vontade de abrir
+      if (!parque) c.saveLayer(null, Paint()..color = Colors.white.withValues(alpha: 0.4));
+      _rodaGigante(c);
+      if (!parque) c.restore();
+    });
+    if (parque) {
+      add(carrossel.x, carrossel.y, carrossel.x + carrossel.y, _carrossel);
+      add(palco.x, palco.y, palco.x + palco.w / 2 + palco.y + palco.d / 2, _palco);
+    }
+    final pe = m.pedido;
+    if (pe != null) {
+      final (emoji, nome, dx, dy) = destinosParque[pe.destino];
+      add(dx, dy, dx + dy + 0.5, (c) {
+        final topo = _iso.p(dx, dy, 1.6 + 0.15 * sin(t * 4));
+        _rotulo(
+          topo,
+          '📦 $emoji $nome · ${pe.qtd}${sucos[pe.suco].emoji} · ${pe.resta.ceil()}s',
+          12,
+          Colors.white,
+          fundo: const Color(0xDD00897B),
+        );
+        pintor.desenhar(c, '⬇️', _iso.tw * 0.3, topo + Offset(0, _iso.tw * 0.35));
+      });
+    }
     for (final cl in m.clientes) {
       lista.add(_Desenho(cl.x + cl.y + 0.01, (c) => _cliente(c, cl)));
     }
@@ -134,6 +184,14 @@ class PintorMundo extends CustomPainter {
     }
     if (m.agito == TipoAgito.calor) {
       c.drawRect(Offset.zero & s, Paint()..color = const Color(0xFFFF8A00).withValues(alpha: 0.10 + 0.04 * sin(t * 2)));
+    }
+    // setas na borda da tela apontando para o pedido e para o depósito
+    if (pe != null) {
+      final (emoji, _, dx, dy) = destinosParque[pe.destino];
+      _setaFora(c, _iso.p(dx, dy), '📦$emoji', const Color(0xFF00897B));
+    }
+    if (m.aberta(Area.pomar) && m.jogador.frutas > 0) {
+      _setaFora(c, _iso.p(depositoFrutas.x, depositoFrutas.y), '🧺', const Color(0xFF2E7D32));
     }
     // por último, os rótulos (sempre visíveis)
     for (final r in _rotulos) {
@@ -249,29 +307,56 @@ class PintorMundo extends CustomPainter {
     (Color(0xFFF2D7D9), Color(0xFFE9C3C7)),
   ];
 
+  bool _naTela(Offset o, [double margem = 1.5]) =>
+      o.dx > -_iso.tw * margem &&
+      o.dx < _tam.width + _iso.tw * margem &&
+      o.dy > -_iso.tw * margem &&
+      o.dy < _tam.height + _iso.tw * margem;
+
+  Color _corPiso(int x, int y) {
+    final par = (x + y).isEven;
+    if (y == 1) return const Color(0xFF5A6270);
+    if (y == 0 || y == 2) return par ? const Color(0xFFD7DCE2) : const Color(0xFFCBD1D8);
+    final area = areaDe(x + 0.5, y + 0.5);
+    Color cor;
+    switch (area) {
+      case Area.praca:
+        if (x <= 2) {
+          cor = par ? const Color(0xFFE9C9A0) : const Color(0xFFE1BE92); // piso das barracas
+        } else if (x >= 3 && x <= 14 && y >= 3 && y <= 14) {
+          final (a, b) = _pisos[m.cidades % _pisos.length];
+          cor = par ? a : b;
+        } else {
+          cor = par ? const Color(0xFF7CC66B) : const Color(0xFF71BA60);
+        }
+      case Area.pomar:
+        cor = y % 5 == 2 ? const Color(0xFFC9A66B) : (par ? const Color(0xFF6DBE5A) : const Color(0xFF63B350));
+      case Area.praia:
+        if (x + 0.5 >= marX) {
+          final onda = 0.5 + 0.5 * sin(t * 2 + x * 0.8 + y * 0.6);
+          cor = Color.lerp(const Color(0xFF29B6F6), const Color(0xFF4FC3F7), onda)!;
+        } else if (x + 1.5 >= marX) {
+          cor = par ? const Color(0xFFE6C88E) : const Color(0xFFDDBE82); // areia molhada
+        } else {
+          cor = par ? const Color(0xFFF5DEB3) : const Color(0xFFEED5A0);
+        }
+      case Area.parque:
+        cor = x == 24 || y == 24 ? const Color(0xFFE0C9A6) : (par ? const Color(0xFF8BD17C) : const Color(0xFF80C671));
+    }
+    return m.aberta(area) ? cor : Color.lerp(cor, const Color(0xFF6B6B6B), 0.55)!;
+  }
+
   void _chao(Canvas c) {
     final i = _iso;
     for (var x = 0; x < larguraMapa; x++) {
       for (var y = 0; y < alturaMapa; y++) {
-        Color cor;
-        if (y == 1) {
-          cor = const Color(0xFF5A6270);
-        } else if (y == 0 || y == 2) {
-          cor = (x + y).isEven ? const Color(0xFFD7DCE2) : const Color(0xFFCBD1D8);
-        } else if (x <= 2) {
-          cor = (x + y).isEven ? const Color(0xFFE9C9A0) : const Color(0xFFE1BE92); // piso das barracas
-        } else if (x >= 3 && x <= 14 && y >= 3 && y <= 14) {
-          final (par, impar) = _pisos[m.cidades % _pisos.length];
-          cor = (x + y).isEven ? par : impar;
-        } else {
-          cor = (x + y).isEven ? const Color(0xFF7CC66B) : const Color(0xFF71BA60);
-        }
+        if (!_naTela(i.p(x + 0.5, y + 0.5))) continue;
         _poligono(c, [
           i.p(x * 1.0, y * 1.0),
           i.p(x + 1.0, y * 1.0),
           i.p(x + 1.0, y + 1.0),
           i.p(x * 1.0, y + 1.0),
-        ], Paint()..color = cor);
+        ], Paint()..color = _corPiso(x, y));
       }
     }
     final faixa = Paint()
@@ -279,6 +364,56 @@ class PintorMundo extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.8);
     for (var x = 0.0; x < larguraMapa; x += 1.2) {
       c.drawLine(i.p(x + 0.2, 1.5), i.p(x + 0.7, 1.5), faixa);
+    }
+    // lago do parque
+    if (_naTela(i.p(lago.x + lago.w / 2, lago.y + lago.d / 2), 4)) {
+      final pts = [
+        for (var k = 0; k < 20; k++)
+          i.p(lago.x + lago.w / 2 + cos(k / 20 * 2 * pi) * lago.w / 2, lago.y + lago.d / 2 + sin(k / 20 * 2 * pi) * lago.d / 2),
+      ];
+      _poligono(c, pts, Paint()..color = m.aberta(Area.parque) ? const Color(0xFF4FC3F7) : const Color(0xFF8A9BA3));
+      if (m.aberta(Area.parque)) pintor.desenhar(c, '🦆', i.tw * 0.25, i.p(lago.x + 1.2 + 0.3 * sin(t * 0.7), lago.y + 0.8, 0.1));
+    }
+    // cercas e placas das áreas fechadas
+    for (final a in Area.values.where((a) => !m.aberta(a))) {
+      final cerca = Paint()
+        ..strokeWidth = 3
+        ..color = const Color(0xFF8D6E63);
+      final cantos = [(a.x0, a.y0), (a.x1, a.y0), (a.x1, a.y1), (a.x0, a.y1)];
+      for (var k = 0; k < 4; k++) {
+        final (x0, y0) = cantos[k];
+        final (x1, y1) = cantos[(k + 1) % 4];
+        final borda =
+            (y0 < 2.5 && y1 < 2.5) || (x0 >= larguraMapa && x1 >= larguraMapa) || (y0 >= alturaMapa && y1 >= alturaMapa);
+        if (borda) continue;
+        c.drawLine(i.p(x0, max(y0, 2.5), 0.5), i.p(x1, max(y1, 2.5), 0.5), cerca);
+        c.drawLine(i.p(x0, max(y0, 2.5), 0.25), i.p(x1, max(y1, 2.5), 0.25), cerca);
+      }
+    }
+    // destino do pedido (anel no chão)
+    final pe = m.pedido;
+    if (pe != null) {
+      final (_, _, dx, dy) = destinosParque[pe.destino];
+      final pulso = 0.5 + 0.5 * sin(t * 5);
+      final r = Rect.fromCenter(center: i.p(dx, dy), width: i.tw * (1.6 + 0.3 * pulso), height: i.th * (1.6 + 0.3 * pulso));
+      c.drawOval(r, Paint()..color = const Color(0xFF26A69A).withValues(alpha: 0.35));
+      c.drawOval(
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..color = Colors.white,
+      );
+    }
+    // depósito de frutas (cesto)
+    if (m.aberta(Area.pomar) && m.jogador.frutas > 0) {
+      final pulso = 0.5 + 0.5 * sin(t * 5);
+      final r = Rect.fromCenter(
+        center: i.p(depositoFrutas.x, depositoFrutas.y),
+        width: i.tw * (1.8 + 0.3 * pulso),
+        height: i.th * (1.8 + 0.3 * pulso),
+      );
+      c.drawOval(r, Paint()..color = const Color(0xFF66BB6A).withValues(alpha: 0.35));
     }
   }
 
@@ -760,6 +895,257 @@ class PintorMundo extends CustomPainter {
       c.drawCircle(_iso.p(wx, y + 1.0, 0.1), _iso.tw * 0.09, Paint()..color = const Color(0xFF263238));
     }
     _rotulo(_iso.p(x + 1.7, y + 0.5, 1.5), '🚌 EXCURSÃO', 11, Colors.white, fundo: const Color(0xCCFF4D6D));
+  }
+
+  /// Seta na borda da tela quando o alvo está fora da vista.
+  void _setaFora(Canvas c, Offset alvo, String emoji, Color cor) {
+    final area = Rect.fromLTWH(40, 150, _tam.width - 80, _tam.height - 260);
+    if (area.contains(alvo)) return;
+    final ctr = _tam.center(Offset.zero);
+    final v = alvo - ctr;
+    final k = min((area.width / 2) / max(v.dx.abs(), 1e-6), (area.height / 2) / max(v.dy.abs(), 1e-6));
+    final ponto = ctr + v * k;
+    final ang = atan2(v.dy, v.dx);
+    c.save();
+    c.translate(ponto.dx, ponto.dy);
+    c.rotate(ang);
+    c.drawPath(Path()..addPolygon(const [Offset(22, 0), Offset(4, -12), Offset(4, 12)], true), Paint()..color = cor);
+    c.restore();
+    c.drawCircle(ponto, 17, Paint()..color = cor);
+    c.drawCircle(
+      ponto,
+      17,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white,
+    );
+    _rotulos.add(_Rotulo(ponto, emoji, 13, Colors.white, null));
+  }
+
+  void _coqueiro(Canvas c, double x, double y) {
+    final alfa = _transparenciaArvore(x, y);
+    if (alfa < 1) c.saveLayer(null, Paint()..color = Colors.white.withValues(alpha: alfa));
+    _sombra(c, x, y, 0.8);
+    final base = _iso.p(x, y), topo = _iso.p(x + 0.15, y - 0.1, 1.9);
+    c.drawPath(
+      Path()
+        ..moveTo(base.dx - 4, base.dy)
+        ..quadraticBezierTo((base.dx + topo.dx) / 2 + 8, (base.dy + topo.dy) / 2, topo.dx, topo.dy)
+        ..lineTo(topo.dx + 3, topo.dy)
+        ..quadraticBezierTo((base.dx + topo.dx) / 2 + 11, (base.dy + topo.dy) / 2, base.dx + 4, base.dy)
+        ..close(),
+      Paint()..color = const Color(0xFF8D6E63),
+    );
+    final folha = Paint()..color = const Color(0xFF43A047);
+    for (var k = 0; k < 6; k++) {
+      final a = k / 6 * 2 * pi + 0.1 * sin(t * 1.5 + x);
+      final fim = topo + Offset(cos(a) * _iso.tw * 0.55, sin(a) * _iso.tw * 0.25 + _iso.tw * 0.12);
+      c.drawPath(
+        Path()
+          ..moveTo(topo.dx, topo.dy)
+          ..quadraticBezierTo((topo.dx + fim.dx) / 2, topo.dy - _iso.tw * 0.12, fim.dx, fim.dy)
+          ..quadraticBezierTo((topo.dx + fim.dx) / 2, topo.dy - _iso.tw * 0.02, topo.dx, topo.dy),
+        folha,
+      );
+    }
+    for (final o in [const Offset(-4, 4), const Offset(4, 5)]) {
+      c.drawCircle(topo + o, 4, Paint()..color = const Color(0xFF6D4C41));
+    }
+    if (alfa < 1) c.restore();
+  }
+
+  void _guardaSol(Canvas c, double x, double y) {
+    _sombra(c, x + 0.3, y + 0.3, 1.0);
+    c.drawLine(
+      _iso.p(x, y),
+      _iso.p(x, y, 1.3),
+      Paint()
+        ..strokeWidth = 2.5
+        ..color = Colors.white,
+    );
+    final topo = _iso.p(x, y, 1.35);
+    final r = _iso.tw * 0.55;
+    for (var k = 0; k < 6; k++) {
+      c.drawArc(
+        Rect.fromCenter(center: topo + Offset(0, r * 0.25), width: r * 2, height: r * 0.9),
+        pi + k * pi / 6,
+        pi / 6,
+        true,
+        Paint()..color = k.isEven ? const Color(0xFFFF4D6D) : Colors.white,
+      );
+    }
+    _caixa(c, x + 0.25, y + 0.05, 0.9, 0.45, 0, 0.12, const Color(0xFF4CC9F0), bordas: 0); // toalha/espreguiçadeira
+  }
+
+  void _quiosque(Canvas c) {
+    final q = quiosque;
+    _sombra(c, q.x + q.w / 2, q.y + 0.6, 3.0);
+    _caixa(c, q.x, q.y, q.w, q.d, 0, 0.85, const Color(0xFFA1887F), topo: const Color(0xFFFFF8E1));
+    final poste = Paint()
+      ..strokeWidth = 2.5
+      ..color = const Color(0xFF6D4C41);
+    for (final (px, py) in [(q.x, q.y), (q.x + q.w, q.y), (q.x + q.w, q.y + q.d), (q.x, q.y + q.d)]) {
+      c.drawLine(_iso.p(px, py, 0.85), _iso.p(px, py, 1.7), poste);
+    }
+    _poligono(c, [
+      _iso.p(q.x - 0.3, q.y - 0.3, 1.7),
+      _iso.p(q.x + q.w + 0.3, q.y - 0.3, 1.7),
+      _iso.p(q.x + q.w + 0.3, q.y + q.d + 0.3, 1.7),
+      _iso.p(q.x - 0.3, q.y + q.d + 0.3, 1.7),
+    ], Paint()..color = const Color(0xFFD7B56D)); // telhado de palha
+    _poligono(c, [
+      _iso.p(q.x - 0.3, q.y + q.d + 0.3, 1.7),
+      _iso.p(q.x + q.w + 0.3, q.y + q.d + 0.3, 1.7),
+      _iso.p(q.x + q.w + 0.3, q.y + q.d + 0.3, 1.5),
+      _iso.p(q.x - 0.3, q.y + q.d + 0.3, 1.5),
+    ], Paint()..color = const Color(0xFFB8934A));
+    pintor.desenhar(c, '🥥', _iso.tw * 0.3, _iso.p(q.x + q.w / 2, q.y + 0.4, 2.05));
+    _rotulo(
+      _iso.p(q.x + q.w / 2, q.y + q.d, 0.4),
+      'QUIOSQUE · 1,5x · ENTREGUE AQUI',
+      10,
+      Colors.white,
+      fundo: const Color(0xCC0277BD),
+    );
+  }
+
+  void _arvoreFruta(Canvas c, double x, double y, int frutas) {
+    final alfa = _transparenciaArvore(x, y);
+    if (alfa < 1) c.saveLayer(null, Paint()..color = Colors.white.withValues(alpha: alfa));
+    _sombra(c, x, y, 1.1);
+    _caixa(c, x - 0.1, y - 0.1, 0.2, 0.2, 0, 0.6, const Color(0xFF795548), bordas: 0);
+    final topo = _iso.p(x, y, 1.15);
+    final r = _iso.tw * 0.42;
+    c.drawCircle(
+      topo,
+      r,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.3, -0.4),
+          colors: [Color(0xFF9CCC65), Color(0xFF2E7D32)],
+        ).createShader(Rect.fromCircle(center: topo, radius: r)),
+    );
+    const pos = [Offset(-0.45, -0.1), Offset(0.35, -0.35), Offset(0.15, 0.35)];
+    for (var k = 0; k < frutas && k < pos.length; k++) {
+      final o = topo + pos[k] * r;
+      c.drawCircle(o, r * 0.2, Paint()..color = const Color(0xFFFF9800));
+      c.drawCircle(o - Offset(r * 0.06, r * 0.06), r * 0.06, Paint()..color = Colors.white70);
+    }
+    if (alfa < 1) c.restore();
+  }
+
+  void _deposito(Canvas c) {
+    final d = depositoFrutas;
+    _sombra(c, d.x, d.y, 1.0);
+    _caixa(c, d.x - 0.45, d.y - 0.35, 0.9, 0.7, 0, 0.55, const Color(0xFFA1887F), topo: const Color(0xFFFFB74D));
+    pintor.desenhar(c, '🧺', _iso.tw * 0.35, _iso.p(d.x, d.y, 0.95));
+    _rotulo(
+      _iso.p(d.x, d.y, 1.5),
+      m.jogador.frutas > 0 ? '🧺 ENTREGUE AS FRUTAS AQUI' : '🧺 DEPÓSITO',
+      10,
+      Colors.white,
+      fundo: const Color(0xCC2E7D32),
+    );
+  }
+
+  void _rodaGigante(Canvas c) {
+    final g = rodaGigante;
+    _caixa(c, g.x, g.y, g.w, g.d, 0, 0.3, const Color(0xFF546E7A));
+    final ctr = _iso.p(g.x + g.w / 2, g.y + g.d / 2, 3.0);
+    final r = _iso.tw * 1.35;
+    final base1 = _iso.p(g.x + 0.1, g.y + g.d / 2, 0.3), base2 = _iso.p(g.x + g.w - 0.1, g.y + g.d / 2, 0.3);
+    final suporte = Paint()
+      ..strokeWidth = 4
+      ..color = const Color(0xFF455A64);
+    c.drawLine(base1, ctr, suporte);
+    c.drawLine(base2, ctr, suporte);
+    c.drawCircle(
+      ctr,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = const Color(0xFFE91E63),
+    );
+    const cores = [
+      Color(0xFFFFC23D),
+      Color(0xFF4CC9F0),
+      Color(0xFF7BD389),
+      Color(0xFFB98CF0),
+      Color(0xFFFF6FA5),
+      Color(0xFFFF9F1C),
+    ];
+    for (var k = 0; k < 8; k++) {
+      final a = t * 0.4 + k / 8 * 2 * pi;
+      final pt = ctr + Offset(cos(a), sin(a)) * r;
+      c.drawLine(
+        ctr,
+        pt,
+        Paint()
+          ..strokeWidth = 1.5
+          ..color = const Color(0xFFF8BBD0),
+      );
+      c.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: pt + const Offset(0, 6), width: 14, height: 11),
+          const Radius.circular(3),
+        ),
+        Paint()..color = cores[k % cores.length],
+      );
+    }
+    c.drawCircle(ctr, 5, Paint()..color = const Color(0xFF455A64));
+  }
+
+  void _carrossel(Canvas c) {
+    final k = carrossel;
+    final base = _iso.p(k.x, k.y);
+    final rx = _iso.tw * k.r, ry = _iso.th * k.r;
+    c.drawOval(Rect.fromCenter(center: base, width: rx * 2, height: ry * 2), Paint()..color = const Color(0xFFBCAAA4));
+    final altura = _iso.zs * 1.4;
+    for (var n = 0; n < 6; n++) {
+      final a = t * 0.8 + n / 6 * 2 * pi;
+      final pe = base + Offset(cos(a) * rx * 0.75, sin(a) * ry * 0.75);
+      c.drawLine(
+        pe,
+        pe - Offset(0, altura),
+        Paint()
+          ..strokeWidth = 2
+          ..color = const Color(0xFFFFD54F),
+      );
+      pintor.desenhar(c, '🐴', _iso.tw * 0.22, pe - Offset(0, altura * (0.35 + 0.1 * sin(t * 3 + n))));
+    }
+    final topo = base - Offset(0, altura);
+    for (var n = 0; n < 8; n++) {
+      c.drawPath(
+        Path()
+          ..moveTo(topo.dx, topo.dy - altura * 0.45)
+          ..lineTo(topo.dx + cos(n / 8 * 2 * pi) * rx * 1.05, topo.dy + sin(n / 8 * 2 * pi) * ry * 1.05)
+          ..lineTo(topo.dx + cos((n + 1) / 8 * 2 * pi) * rx * 1.05, topo.dy + sin((n + 1) / 8 * 2 * pi) * ry * 1.05)
+          ..close(),
+        Paint()..color = n.isEven ? const Color(0xFFE53935) : Colors.white,
+      );
+    }
+  }
+
+  void _palco(Canvas c) {
+    final p = palco;
+    _caixa(c, p.x, p.y, p.w, p.d, 0, 0.5, const Color(0xFF5D4037), topo: const Color(0xFF8D6E63));
+    _poligono(c, [
+      _iso.p(p.x, p.y + 0.1, 0.5),
+      _iso.p(p.x + p.w, p.y + 0.1, 0.5),
+      _iso.p(p.x + p.w, p.y + 0.1, 2.0),
+      _iso.p(p.x, p.y + 0.1, 2.0),
+    ], Paint()..color = const Color(0xFFC62828)); // cortina
+    for (var k = 0; k < 3; k++) {
+      final luz = 0.5 + 0.5 * sin(t * 3 + k * 2);
+      c.drawCircle(
+        _iso.p(p.x + 0.8 + k * 1.4, p.y + 0.1, 2.1),
+        5,
+        Paint()..color = Color.lerp(const Color(0xFFFFF59D), const Color(0xFFFFC107), luz)!,
+      );
+    }
+    pintor.desenhar(c, '🎤', _iso.tw * 0.3, _iso.p(p.x + p.w / 2, p.y + p.d / 2, 0.85));
   }
 
   static String _curto(double v) {

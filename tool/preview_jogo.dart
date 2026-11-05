@@ -34,8 +34,12 @@ Future<void> main() async {
     'tycoon' => const Tycoon3dScreen(),
     'tycoon_inicio' => const TycoonInicio(),
     'tycoon_agito' => Tycoon3dScreen(
-        agitoPrevia: TipoAgito.values.byName(Uri.base.queryParameters['agito'] ?? 'moedas'),
-        posicaoPrevia: Uri.base.queryParameters['placa'] == '1' ? (xPlacas, posicoesBarracas[1].$2) : null,
+        agitoPrevia: TipoAgito.values.asNameMap()[Uri.base.queryParameters['agito'] ?? 'moedas'],
+        posicaoPrevia: Uri.base.queryParameters['placa'] == '1'
+            ? (xPlacas, posicoesBarracas[1].$2)
+            : Uri.base.queryParameters.containsKey('x')
+                ? (double.parse(Uri.base.queryParameters['x']!), double.parse(Uri.base.queryParameters['y']!))
+                : null,
       ),
     'suco_web' => const wb.SucoWebInicio(codigo: 'K7Q2PMNX'),
     'suco_erro' => const Tycoon3dScreen(codigoGrupo: 'K7Q2PMNX'),

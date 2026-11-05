@@ -7,8 +7,62 @@ library;
 
 import 'dart:math';
 
-const larguraMapa = 16.0;
-const alturaMapa = 16.0;
+const larguraMapa = 32.0;
+const alturaMapa = 32.0;
+
+/// Áreas do mundo aberto. A praça já vem aberta; as outras abrem com uma placa na divisa.
+enum Area {
+  praca('🏙️', 'Praça Central', 0, 0, 0, 16.25, 16.25),
+  pomar('🍊', 'Pomar', 300, 0, 16.25, 16.25, 32),
+  praia('🏖️', 'Praia', 2000, 16.25, 0, 32, 16.25),
+  parque('🎡', 'Parque', 12000, 16.25, 16.25, 32, 32);
+
+  final String emoji, nome;
+  final double custo, x0, y0, x1, y1;
+  const Area(this.emoji, this.nome, this.custo, this.x0, this.y0, this.x1, this.y1);
+
+  bool contem(double x, double y) => x >= x0 && x < x1 && y >= y0 && y < y1;
+}
+
+Area areaDe(double x, double y) => Area.values.firstWhere((a) => a.contem(x, y), orElse: () => Area.praca);
+
+/// 🍊 Pomar: árvores com frutas e o depósito (cada fruta enche as barracas).
+const arvoresPomar = <(double, double)>[
+  (3.0, 20.0),
+  (7.0, 20.0),
+  (11.0, 20.0),
+  (3.0, 25.5),
+  (7.0, 25.5),
+  (11.0, 25.5),
+  (5.0, 29.5),
+  (9.5, 29.5),
+];
+const depositoFrutas = (x: 13.8, y: 17.6);
+const maxFrutasArvore = 3;
+
+/// 🏖️ Praia: quiosque com fila própria (clientes pagam 1,5x). O mar não dá para atravessar.
+const quiosque = (x: 20.0, y: 4.0, w: 3.6, d: 0.8);
+const vagasPraia = <(double, double)>[(20.6, 3.4), (21.8, 3.4), (23.0, 3.4)];
+const marX = 28.6;
+
+/// 🎡 Parque: pedidos com tempo para entregar em pontos do parque (pagam 3x).
+const destinosParque = <(String, String, double, double)>[
+  ('🎡', 'Roda-gigante', 22.0, 21.8),
+  ('🎠', 'Carrossel', 28.0, 25.6),
+  ('🎤', 'Palco', 20.6, 28.4),
+  ('🦆', 'Lago', 27.4, 19.6),
+];
+const rodaGigante = (x: 21.2, y: 19.6, w: 1.6, d: 1.0);
+const carrossel = (x: 28.0, y: 27.6, r: 1.1);
+const palco = (x: 18.4, y: 29.2, w: 4.4, d: 1.8);
+const lago = (x: 27.6, y: 17.2, w: 3.4, d: 1.6);
+
+class Pedido {
+  final int suco, qtd, destino;
+  double resta;
+  final double valor;
+  Pedido(this.suco, this.qtd, this.destino, this.resta, this.valor);
+}
 
 class Suco {
   final String nome, emoji;
@@ -71,7 +125,7 @@ class Barraca {
   double get custoMelhorar => suco.preco * 25 * pow(1.6, nivel - 1);
 }
 
-enum TipoPlaca { abrir, melhorar }
+enum TipoPlaca { abrir, melhorar, area }
 
 class Placa {
   final TipoPlaca tipo;
@@ -124,7 +178,21 @@ enum Boost {
 }
 
 // ---------------- Missões ----------------
-enum TipoMissao { copos, faturar, abrir, nivelLimonada, computador, ajudantes, boost, empresa, mochila, cidade }
+enum TipoMissao {
+  copos,
+  faturar,
+  abrir,
+  nivelLimonada,
+  computador,
+  ajudantes,
+  boost,
+  empresa,
+  mochila,
+  cidade,
+  frutas,
+  pedidos,
+  areas,
+}
 
 class Missao {
   final String texto;
@@ -169,6 +237,8 @@ class Pessoa {
   double parado = 0;
   double andando = 0;
   bool olhandoEsquerda = false;
+  int frutas = 0; // cesta do pomar
+  double colherEm = 0;
   String? placaAtual; // em cima de qual placa está
   double naPlaca = 0; // há quanto tempo (só começa a cobrar depois de [esperaPlaca])
   Pessoa(this.x, this.y, {this.ajudante = false});
@@ -234,11 +304,32 @@ class Cliente {
   double feliz = 0;
   double andando = 0;
   bool vip = false;
+  bool praia = false; // cliente do quiosque da praia
   double paciencia = 0; // VIP: segundos até desistir
   Cliente(this.x, this.y, this.quer, this.faltam, this.aparencia);
 }
 
-enum TipoEvento { pegou, vendeu, comprou, abriu, contratou, missao, sentou, poeira, combo, agito, moeda, fruta, vip, cidade }
+enum TipoEvento {
+  pegou,
+  vendeu,
+  comprou,
+  abriu,
+  contratou,
+  missao,
+  sentou,
+  poeira,
+  combo,
+  agito,
+  moeda,
+  fruta,
+  vip,
+  cidade,
+  area,
+  colheu,
+  frutas,
+  pedido,
+  pedidoNovo,
+}
 
 class Evento {
   final TipoEvento tipo;
@@ -290,6 +381,17 @@ class Mundo {
   int combo = 0;
   double comboTempo = 0;
   int cidades = 0; // quantas vezes recomeçou em uma cidade nova
+
+  // mundo aberto
+  final areas = <Area>{Area.praca};
+  final frutasArvore = List<int>.filled(arvoresPomar.length, maxFrutasArvore);
+  final _cresceArvore = List<double>.filled(arvoresPomar.length, 0);
+  int frutasColhidas = 0, pedidosFeitos = 0;
+  Pedido? pedido;
+  double _proximoPedido = 4;
+  double _proximoPraia = 2;
+  bool aberta(Area a) => areas.contains(a);
+  int get capacidadeCesta => 5 + nivelMochila;
   static const tempoCombo = 3.0;
 
   double get multCombo => 1 + min(max(combo - 1, 0), 10) * 0.1; // até x2
@@ -341,22 +443,47 @@ class Mundo {
     for (final b in barracas.where((b) => b.aberta && b.nivel < 10)) {
       l.add(Placa(TipoPlaca.melhorar, b.indice, xPlacas, b.y));
     }
+    // placas das áreas, na divisa (do lado que já dá para chegar)
+    if (!aberta(Area.pomar)) l.add(Placa(TipoPlaca.area, Area.pomar.index, 6.2, 15.5));
+    if (!aberta(Area.praia)) l.add(Placa(TipoPlaca.area, Area.praia.index, 15.5, 7.4));
+    if (!aberta(Area.parque)) {
+      if (aberta(Area.praia)) {
+        l.add(Placa(TipoPlaca.area, Area.parque.index, 23.8, 15.5));
+      } else if (aberta(Area.pomar)) {
+        l.add(Placa(TipoPlaca.area, Area.parque.index, 15.5, 23.0));
+      }
+    }
     for (final p in l) {
       p.pago = pagos[p.id] ?? 0;
     }
     return l;
   }
 
-  double custo(Placa p) => p.tipo == TipoPlaca.abrir ? sucos[p.alvo].custoAbrir : barracas[p.alvo].custoMelhorar;
+  double custo(Placa p) => switch (p.tipo) {
+    TipoPlaca.abrir => sucos[p.alvo].custoAbrir,
+    TipoPlaca.melhorar => barracas[p.alvo].custoMelhorar,
+    TipoPlaca.area => Area.values[p.alvo].custo,
+  };
 
-  String rotulo(Placa p) => p.tipo == TipoPlaca.abrir
-      ? 'Abrir ${sucos[p.alvo].nome}'
-      : 'Melhorar ${sucos[p.alvo].nome} → nv ${barracas[p.alvo].nivel + 1}';
+  String rotulo(Placa p) => switch (p.tipo) {
+    TipoPlaca.abrir => 'Abrir ${sucos[p.alvo].nome}',
+    TipoPlaca.melhorar => 'Melhorar ${sucos[p.alvo].nome} → nv ${barracas[p.alvo].nivel + 1}',
+    TipoPlaca.area => 'Abrir ${Area.values[p.alvo].emoji} ${Area.values[p.alvo].nome}',
+  };
 
-  String icone(Placa p) => p.tipo == TipoPlaca.abrir ? sucos[p.alvo].emoji : '⬆️';
+  String icone(Placa p) => switch (p.tipo) {
+    TipoPlaca.abrir => sucos[p.alvo].emoji,
+    TipoPlaca.melhorar => '⬆️',
+    TipoPlaca.area => '🔓',
+  };
 
   Evento _aplicarPlaca(Placa p) {
     pagos.remove(p.id);
+    if (p.tipo == TipoPlaca.area) {
+      final a = Area.values[p.alvo];
+      areas.add(a);
+      return Evento(TipoEvento.area, p.x, p.y, suco: a.index, texto: '${a.emoji} ${a.nome} aberta!');
+    }
     if (p.tipo == TipoPlaca.abrir) {
       barracas[p.alvo].aberta = true;
       return Evento(TipoEvento.abriu, p.x, p.y, suco: p.alvo);
@@ -474,10 +601,15 @@ class Mundo {
     if (missao < missoes.length) return missoes[missao];
     final k = missao - missoes.length;
     final premio = (precoMedio * 150 * (1 + k * 0.2)).roundToDouble();
-    final r = k ~/ 3 + 1;
-    return switch (k % 3) {
+    final r = k ~/ 5 + 1;
+    if (areas.length < Area.values.length && k == 0) {
+      return Missao('Abra todas as áreas do mapa', TipoMissao.areas, Area.values.length.toDouble(), premio);
+    }
+    return switch (k % 5) {
       0 => Missao('Venda ${2000 + r * 1500} copos', TipoMissao.copos, 2000.0 + r * 1500, premio),
-      1 => Missao('Fature ${reais3d(1e6 * pow(4, r))}', TipoMissao.faturar, 1e6 * pow(4, r).toDouble(), premio),
+      1 => Missao('Colha ${r * 40} frutas no pomar', TipoMissao.frutas, r * 40.0, premio),
+      2 => Missao('Fature ${reais3d(1e6 * pow(4, r))}', TipoMissao.faturar, 1e6 * pow(4, r).toDouble(), premio),
+      3 => Missao('Entregue ${r * 8} pedidos no parque', TipoMissao.pedidos, r * 8.0, premio),
       _ => Missao('Abra uma cidade nova ($rª)', TipoMissao.cidade, r.toDouble(), premio),
     };
   }
@@ -493,6 +625,9 @@ class Mundo {
     TipoMissao.empresa => totalMelhorias.toDouble(),
     TipoMissao.mochila => nivelMochila.toDouble(),
     TipoMissao.cidade => cidades.toDouble(),
+    TipoMissao.frutas => frutasColhidas.toDouble(),
+    TipoMissao.pedidos => pedidosFeitos.toDouble(),
+    TipoMissao.areas => areas.length.toDouble(),
   };
 
   double get progressoMissao {
@@ -520,6 +655,15 @@ class Mundo {
     (balcao.x, balcao.y, balcao.w, balcao.d),
     (mesa.x, mesa.y, mesa.w, mesa.d),
     (fonte.x, fonte.y, fonte.w, fonte.d),
+    for (final a in Area.values)
+      if (!aberta(a)) (a.x0, a.y0, a.x1 - a.x0, a.y1 - a.y0),
+    (marX, 0, larguraMapa - marX, 16.25), // mar
+    (quiosque.x, quiosque.y, quiosque.w, quiosque.d),
+    for (final (x, y) in arvoresPomar) (x - 0.3, y - 0.3, 0.6, 0.6),
+    (rodaGigante.x, rodaGigante.y, rodaGigante.w, rodaGigante.d),
+    (carrossel.x - carrossel.r, carrossel.y - carrossel.r, carrossel.r * 2, carrossel.r * 2),
+    (palco.x, palco.y, palco.w, palco.d),
+    (lago.x, lago.y, lago.w, lago.d),
   ];
 
   bool _bate(double x, double y) {
@@ -572,6 +716,8 @@ class Mundo {
     comboTempo = max(0, comboTempo - dt);
     if (comboTempo <= 0) combo = 0;
     _agitos(dt, andando, eventos);
+    _pomar(dt, andando, eventos);
+    _parque(dt, andando, eventos);
     if (amigos.values.any((a) => a.sentado)) usouComputador = true;
     _cadeira(dt, eventos);
     // delivery: vende sozinho pelo app
@@ -664,11 +810,104 @@ class Mundo {
   }
 
   (double, double) _lugarLivre() {
-    for (var k = 0; k < 40; k++) {
-      final x = 4.6 + _rnd.nextDouble() * 9.6, y = 5.6 + _rnd.nextDouble() * 9;
+    final opcoes = areas.toList();
+    for (var k = 0; k < 60; k++) {
+      final a = opcoes[_rnd.nextInt(opcoes.length)];
+      final x0 = a == Area.praca ? 4.6 : a.x0 + 1, y0 = a == Area.praca ? 5.6 : max(a.y0 + 1, 3.2);
+      final x1 = a == Area.praia ? marX - 0.8 : a.x1 - 1, y1 = a.y1 - 1;
+      final x = x0 + _rnd.nextDouble() * (x1 - x0), y = y0 + _rnd.nextDouble() * (y1 - y0);
       if (!_bate(x, y)) return (x, y);
     }
     return (8.6, 7.0);
+  }
+
+  // ---------------- pomar e parque ----------------
+  void _pomar(double dt, List<Pessoa> andando, List<Evento> eventos) {
+    if (!aberta(Area.pomar)) return;
+    for (var k = 0; k < arvoresPomar.length; k++) {
+      if (frutasArvore[k] >= maxFrutasArvore) continue;
+      _cresceArvore[k] += dt * multProducao;
+      if (_cresceArvore[k] >= 7) {
+        _cresceArvore[k] = 0;
+        frutasArvore[k]++;
+      }
+    }
+    for (final p in andando) {
+      p.colherEm -= dt;
+      if (p.colherEm <= 0 && p.frutas < capacidadeCesta) {
+        for (var k = 0; k < arvoresPomar.length; k++) {
+          final (ax, ay) = arvoresPomar[k];
+          if (frutasArvore[k] > 0 && (ax - p.x).abs() < 1.1 && (ay - p.y).abs() < 1.1) {
+            frutasArvore[k]--;
+            p.frutas++;
+            p.colherEm = 0.3;
+            eventos.add(Evento(TipoEvento.colheu, ax, ay));
+            break;
+          }
+        }
+      }
+      if (p.frutas > 0 && (depositoFrutas.x - p.x).abs() < 1.0 && (depositoFrutas.y - p.y).abs() < 1.0) {
+        final n = p.frutas;
+        p.frutas = 0;
+        frutasColhidas += n;
+        for (final b in barracas.where((b) => b.aberta)) {
+          b.estoque = min(capacidadeBarraca(b), b.estoque + 2 * n);
+        }
+        eventos.add(
+          Evento(
+            TipoEvento.frutas,
+            depositoFrutas.x,
+            depositoFrutas.y,
+            valor: n.toDouble(),
+            texto: '🧺 +$n frutas: barracas reabastecidas!',
+          ),
+        );
+      }
+    }
+  }
+
+  void _parque(double dt, List<Pessoa> andando, List<Evento> eventos) {
+    if (!aberta(Area.parque)) return;
+    final pe = pedido;
+    if (pe == null) {
+      _proximoPedido -= dt;
+      if (_proximoPedido > 0) return;
+      final abertasL = barracas.where((b) => b.aberta).toList();
+      final suco = abertasL[_rnd.nextInt(abertasL.length)].indice;
+      final qtd = min(capacidade, 2 + _rnd.nextInt(3));
+      final destino = _rnd.nextInt(destinosParque.length);
+      pedido = Pedido(suco, qtd, destino, 50, (preco(barracas[suco]) * qtd * 3).roundToDouble());
+      eventos.add(
+        Evento(
+          TipoEvento.pedidoNovo,
+          destinosParque[destino].$3,
+          destinosParque[destino].$4,
+          texto: '📦 Pedido: $qtd ${sucos[suco].emoji} no(a) ${destinosParque[destino].$2}',
+        ),
+      );
+      return;
+    }
+    pe.resta -= dt;
+    final (_, nome, dx, dy) = destinosParque[pe.destino];
+    for (final p in andando) {
+      if ((dx - p.x).abs() < 1.1 && (dy - p.y).abs() < 1.1 && p.carga.where((s) => s == pe.suco).length >= pe.qtd) {
+        for (var k = 0; k < pe.qtd; k++) {
+          p.carga.remove(pe.suco);
+        }
+        dinheiro += pe.valor;
+        vendidoTotal += pe.valor;
+        copos += pe.qtd;
+        pedidosFeitos++;
+        pedido = null;
+        _proximoPedido = 5;
+        eventos.add(Evento(TipoEvento.pedido, dx, dy, valor: pe.valor, texto: '📦 Pedido entregue no(a) $nome!'));
+        return;
+      }
+    }
+    if (pe.resta <= 0) {
+      pedido = null;
+      _proximoPedido = 6;
+    }
   }
 
   void _moverAmigos(double dt) {
@@ -750,13 +989,35 @@ class Mundo {
       'e': paraJson(DateTime.now()),
       'cl': [
         for (final c in clientes)
-          [c.id, r(c.x), r(c.y), c.quer, c.faltam, c.aparencia, c.estado.index, r(c.feliz), c.vip ? 1 : 0, r(c.paciencia)],
+          [
+            c.id,
+            r(c.x),
+            r(c.y),
+            c.quer,
+            c.faltam,
+            c.aparencia,
+            c.estado.index,
+            r(c.feliz),
+            c.vip ? 1 : 0,
+            r(c.paciencia),
+            c.praia ? 1 : 0,
+          ],
       ],
       'js': {
-        meuId: {'x': r(jogador.x), 'y': r(jogador.y), 'c': jogador.carga, 's': sentado, 'n': meuNome, 'o': minhaCor},
+        meuId: {
+          'x': r(jogador.x),
+          'y': r(jogador.y),
+          'c': jogador.carga,
+          's': sentado,
+          'n': meuNome,
+          'o': minhaCor,
+          'f': jogador.frutas,
+        },
         for (final a in amigos.values)
-          a.id: {'x': r(a.alvoX), 'y': r(a.alvoY), 'c': a.carga, 's': a.sentado, 'n': a.nome, 'o': a.cor},
+          a.id: {'x': r(a.alvoX), 'y': r(a.alvoY), 'c': a.carga, 's': a.sentado, 'n': a.nome, 'o': a.cor, 'f': a.frutas},
       },
+      'arv': frutasArvore,
+      'pe': pedido == null ? null : [pedido!.suco, pedido!.qtd, pedido!.destino, r(pedido!.resta), pedido!.valor],
       'ev': ev,
       'ag': agito == null ? null : [agito!.index, r(agitoResta)],
       'mo': [
@@ -790,7 +1051,8 @@ class Mundo {
           ..estado = EstadoCliente.values[item[6] is int ? (item[6] as int).clamp(0, 2) : 0]
           ..feliz = item[7] is num ? (item[7] as num).toDouble().clamp(0, 2) : 0
           ..vip = item.length > 8 && item[8] == 1
-          ..paciencia = item.length > 9 && item[9] is num ? (item[9] as num).toDouble().clamp(0, 60) : 0;
+          ..paciencia = item.length > 9 && item[9] is num ? (item[9] as num).toDouble().clamp(0, 60) : 0
+          ..praia = item.length > 10 && item[10] == 1;
         clientes.add(c);
       }
     }
@@ -807,12 +1069,16 @@ class Mundo {
                   if (k is int && k >= 0 && k < sucos.length) k,
               ]
             : <int>[];
+        final f = dados['f'];
+        final frutas = f is int ? f.clamp(0, 50) : 0;
         if (id == meuId) {
           jogador.carga
             ..clear()
             ..addAll(lista);
+          jogador.frutas = frutas;
         } else {
           atualizarAmigo(id, dados);
+          amigos[id]?.frutas = frutas;
           amigos[id]?.carga
             ?..clear()
             ..addAll(lista);
@@ -820,6 +1086,22 @@ class Mundo {
       }
       amigos.removeWhere((id, _) => !js.containsKey(id));
     }
+    final arv = d['arv'];
+    if (arv is List) {
+      for (var k = 0; k < frutasArvore.length && k < arv.length; k++) {
+        if (arv[k] is int) frutasArvore[k] = (arv[k] as int).clamp(0, maxFrutasArvore);
+      }
+    }
+    final pe = d['pe'];
+    pedido = pe is List && pe.length == 5 && pe[0] is int && pe[1] is int && pe[2] is int && pe[3] is num && pe[4] is num
+        ? Pedido(
+            (pe[0] as int).clamp(0, sucos.length - 1),
+            (pe[1] as int).clamp(1, 30),
+            (pe[2] as int).clamp(0, destinosParque.length - 1),
+            (pe[3] as num).toDouble().clamp(0, 120),
+            (pe[4] as num).toDouble().clamp(0, 1e15),
+          )
+        : null;
     final ag = d['ag'];
     if (ag is List && ag.length == 2 && ag[0] is int && ag[1] is num) {
       agito = TipoAgito.values[(ag[0] as int).clamp(0, TipoAgito.values.length - 1)];
@@ -960,10 +1242,19 @@ class Mundo {
       p.y > balcao.y + balcao.d - 0.1 &&
       p.y < balcao.y + balcao.d + 1.3;
 
+  bool _pertoDoQuiosque(Pessoa p) =>
+      aberta(Area.praia) &&
+      p.x > quiosque.x - 0.4 &&
+      p.x < quiosque.x + quiosque.w + 0.4 &&
+      p.y > quiosque.y + quiosque.d - 0.1 &&
+      p.y < quiosque.y + quiosque.d + 1.3;
+
   List<Evento> _entregar(Pessoa p, double dt) {
     p.entregarEm -= dt;
-    if (p.entregarEm > 0 || p.carga.isEmpty || !_pertoDoBalcao(p)) return const [];
-    for (final c in clientes.where((c) => c.estado == EstadoCliente.esperando)) {
+    if (p.entregarEm > 0 || p.carga.isEmpty) return const [];
+    final naPraia = _pertoDoQuiosque(p);
+    if (!naPraia && !_pertoDoBalcao(p)) return const [];
+    for (final c in clientes.where((c) => c.estado == EstadoCliente.esperando && c.praia == naPraia)) {
       final k = p.carga.lastIndexOf(c.quer);
       if (k < 0) continue;
       p.carga.removeAt(k);
@@ -976,7 +1267,7 @@ class Mundo {
           eventos.add(Evento(TipoEvento.combo, c.x, c.y, valor: multCombo, texto: 'COMBO x${multCombo.toStringAsFixed(1)}!'));
         }
       }
-      final v = preco(barracas[c.quer]) * (p.ajudante ? 1 : multCombo) * (c.vip ? 5 : 1);
+      final v = preco(barracas[c.quer]) * (p.ajudante ? 1 : multCombo) * (c.vip ? 5 : 1) * (c.praia ? 1.5 : 1);
       dinheiro += v;
       vendidoTotal += v;
       copos++;
@@ -1051,40 +1342,53 @@ class Mundo {
           break;
         }
       }
-      final daEsquerda = _rnd.nextBool();
-      clientes.add(
-        Cliente(daEsquerda ? -0.5 : larguraMapa + 0.5, ruaY, quer, 1 + _rnd.nextInt(2), _rnd.nextInt(8))..id = ++_idCliente,
-      );
+      clientes.add(Cliente(-0.5, ruaY, quer, 1 + _rnd.nextInt(2), _rnd.nextInt(8))..id = ++_idCliente);
+    }
+    // praia: banhistas chegam pela ponta da rua e vão ao quiosque
+    if (aberta(Area.praia)) {
+      _proximoPraia -= dt * (promo ? 2 : 1);
+      final naPraia = clientes.where((c) => c.praia).length;
+      if (_proximoPraia <= 0 && naPraia < 4 + nivel(Habilidade.marketing)) {
+        _proximoPraia = 3.2 * (0.7 + _rnd.nextDouble() * 0.6);
+        final abertasL = barracas.where((b) => b.aberta).toList();
+        clientes.add(
+          Cliente(larguraMapa + 0.5, ruaY, abertasL[_rnd.nextInt(abertasL.length)].indice, 1 + _rnd.nextInt(3), _rnd.nextInt(8))
+            ..id = ++_idCliente
+            ..praia = true,
+        );
+      }
     }
     final vs = vagas;
     final ocupadas = {
       for (final c in clientes)
-        if (c.vaga >= 0 && c.estado != EstadoCliente.saindo) c.vaga,
+        if (c.vaga >= 0 && c.estado != EstadoCliente.saindo) (c.praia, c.vaga),
     };
+    var filaPraca = 0, filaPraia = 0;
     for (final c in clientes) {
       double tx, ty;
+      final minhas = c.praia ? vagasPraia : vs;
       switch (c.estado) {
         case EstadoCliente.chegando:
           if (c.vaga < 0) {
             final livre = [
-              for (var v = 0; v < vs.length; v++)
-                if (!ocupadas.contains(v)) v,
+              for (var v = 0; v < minhas.length; v++)
+                if (!ocupadas.contains((c.praia, v))) v,
             ].firstOrNull;
             if (livre != null) {
               c.vaga = livre;
-              ocupadas.add(livre);
+              ocupadas.add((c.praia, livre));
             }
           }
           if (c.vaga < 0) {
-            tx = 2.5 + clientes.indexOf(c) * 0.8;
+            tx = c.praia ? 25.0 + (filaPraia++) * 0.8 : 2.5 + (filaPraca++) * 0.8;
             ty = ruaY;
           } else {
-            (tx, ty) = vs[c.vaga];
+            (tx, ty) = minhas[c.vaga];
           }
         case EstadoCliente.esperando:
-          (tx, ty) = vs[c.vaga];
+          (tx, ty) = minhas[min(c.vaga, minhas.length - 1)];
         case EstadoCliente.saindo:
-          tx = c.x < larguraMapa / 2 ? -1.0 : larguraMapa + 1;
+          tx = c.praia ? larguraMapa + 1 : -1.0;
           ty = ruaY;
           c.feliz = max(0, c.feliz - dt);
       }
@@ -1144,6 +1448,9 @@ class Mundo {
     'emp': {for (final e in melhorias.entries) e.key.name: e.value},
     'pagos': pagos,
     'cid': cidades,
+    'areas': [for (final a in areas) a.name],
+    'frutasC': frutasColhidas,
+    'pedidosF': pedidosFeitos,
     'bo': {
       for (final e in boosts.entries)
         if (e.value > 0) e.key.name: e.value.roundToDouble(),
@@ -1167,6 +1474,17 @@ class Mundo {
     boostsUsados = i(j['boosts'], 1 << 20);
     usouComputador = j['pc'] == true;
     cidades = i(j['cid'], 100);
+    frutasColhidas = i(j['frutasC'], 1 << 30);
+    pedidosFeitos = i(j['pedidosF'], 1 << 30);
+    final ar = j['areas'];
+    areas
+      ..clear()
+      ..add(Area.praca);
+    if (ar is List) {
+      for (final a in Area.values) {
+        if (ar.contains(a.name)) areas.add(a);
+      }
+    }
     final hab = j['hab'];
     for (final h in Habilidade.values) {
       habilidades[h] = hab is Map ? i(hab[h.name], maxHabilidade) : 0;

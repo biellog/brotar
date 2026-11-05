@@ -378,16 +378,131 @@ void main() {
     expect(nomeCidade(1), 'Vila do Sol');
   });
 
-  test('missões nunca acabam', () {
+  test('missões nunca acabam (e passam pelas áreas novas)', () {
     final m = Mundo(Random(1))..missao = missoes.length;
-    final a = m.missaoAtual!;
-    m.missao++;
-    final b = m.missaoAtual!;
-    m.missao++;
-    final c = m.missaoAtual!;
-    expect({a.tipo, b.tipo, c.tipo}, {TipoMissao.copos, TipoMissao.faturar, TipoMissao.cidade});
-    expect(a.premio, greaterThan(0));
+    expect(m.missaoAtual!.tipo, TipoMissao.areas); // primeiro: abrir o mapa todo
+    m.areas.addAll(Area.values);
+    final tipos = <TipoMissao>{};
+    for (var k = 0; k < 5; k++) {
+      tipos.add(m.missaoAtual!.tipo);
+      expect(m.missaoAtual!.premio, greaterThan(0));
+      m.missao++;
+    }
+    expect(tipos, {TipoMissao.copos, TipoMissao.frutas, TipoMissao.faturar, TipoMissao.pedidos, TipoMissao.cidade});
     m.missao += 300;
     expect(m.missaoAtual, isNotNull);
+  });
+
+  test('mapa maior: áreas fechadas não deixam passar até abrir pela placa', () {
+    final m = Mundo(Random(1))..dinheiro = 1e6;
+    expect(m.aberta(Area.praca), isTrue);
+    expect(m.aberta(Area.praia), isFalse);
+    m.jogador
+      ..x = 14
+      ..y = 11;
+    irPara(m, 24, 11, maxSeg: 6); // tenta ir para a praia (longe da placa)
+    expect(m.jogador.x, lessThan(16.3));
+    expect(m.aberta(Area.praia), isFalse);
+    final placa = m.placas.firstWhere((p) => p.tipo == TipoPlaca.area && p.alvo == Area.praia.index);
+    irPara(m, placa.x, placa.y);
+    final ev = <Evento>[];
+    for (var t = 0.0; t < esperaPlaca + 3; t += 0.05) {
+      ev.addAll(m.passo(0.05, 0, 0));
+    }
+    expect(m.aberta(Area.praia), isTrue);
+    expect(ev.any((e) => e.tipo == TipoEvento.area), isTrue);
+    irPara(m, 22, 8, maxSeg: 8);
+    expect(areaDe(m.jogador.x, m.jogador.y), Area.praia);
+  });
+
+  test('o mar não dá para atravessar', () {
+    final m = Mundo(Random(1))..areas.add(Area.praia);
+    m.jogador
+      ..x = 26
+      ..y = 9;
+    irPara(m, 31, 9, maxSeg: 4);
+    expect(m.jogador.x, lessThan(marX));
+  });
+
+  test('pomar: colher frutas e levar ao depósito enche as barracas', () {
+    final m = Mundo(Random(1))..areas.add(Area.pomar);
+    m.barracas[1].aberta = true;
+    final (ax, ay) = arvoresPomar[1];
+    irPara(m, ax, ay - 0.9);
+    esperar(m, 2);
+    expect(m.jogador.frutas, greaterThan(0));
+    final ev = <Evento>[];
+    final antes = m.jogador.frutas;
+    irPara(m, depositoFrutas.x, depositoFrutas.y);
+    ev.addAll(m.passo(0.05, 0, 0));
+    expect(m.jogador.frutas, 0);
+    expect(m.frutasColhidas, greaterThanOrEqualTo(antes));
+    expect(m.barracas[1].estoque, greaterThan(0));
+  });
+
+  test('pomar: a árvore volta a dar fruta com o tempo', () {
+    final m = Mundo(Random(1))..areas.add(Area.pomar);
+    m.frutasArvore[0] = 0;
+    esperar(m, 8);
+    expect(m.frutasArvore[0], greaterThan(0));
+  });
+
+  test('praia: banhistas no quiosque pagam 1,5x', () {
+    final m = Mundo(Random(1))..areas.add(Area.praia);
+    esperar(m, 30);
+    final banhista = m.clientes.where((c) => c.praia && c.estado == EstadoCliente.esperando).firstOrNull;
+    expect(banhista, isNotNull);
+    m.jogador
+      ..x = quiosque.x + 1
+      ..y = quiosque.y + quiosque.d + 0.5
+      ..carga.addAll(List.filled(3, banhista!.quer));
+    final d0 = m.dinheiro;
+    final ev = m.passo(0.05, 0, 0);
+    final venda = ev.firstWhere((e) => e.tipo == TipoEvento.vendeu);
+    expect(m.dinheiro - d0, closeTo(venda.valor, 1e-9));
+    expect(venda.valor, closeTo(m.preco(m.barracas[banhista.quer]) * 1.5, 1e-9));
+  });
+
+  test('parque: pedido com tempo, entregar no destino paga 3x', () {
+    final m = Mundo(Random(1))..areas.add(Area.parque);
+    final ev = <Evento>[];
+    for (var t = 0.0; t < 6; t += 0.05) {
+      ev.addAll(m.passo(0.05, 0, 0));
+    }
+    final pe = m.pedido!;
+    expect(ev.any((e) => e.tipo == TipoEvento.pedidoNovo), isTrue);
+    final (_, _, dx, dy) = destinosParque[pe.destino];
+    m.jogador
+      ..x = dx
+      ..y = dy
+      ..carga.addAll(List.filled(pe.qtd, pe.suco));
+    final d0 = m.dinheiro;
+    final ev2 = m.passo(0.05, 0, 0);
+    expect(ev2.any((e) => e.tipo == TipoEvento.pedido), isTrue);
+    expect(m.dinheiro - d0, closeTo(pe.valor, 1e-9));
+    expect(pe.valor, closeTo((m.preco(m.barracas[pe.suco]) * pe.qtd * 3).roundToDouble(), 1));
+    expect(m.pedidosFeitos, 1);
+    expect(m.jogador.carga, isEmpty);
+  });
+
+  test('parque: pedido some se o tempo acabar e outro aparece depois', () {
+    final m = Mundo(Random(1))..areas.add(Area.parque);
+    esperar(m, 6);
+    expect(m.pedido, isNotNull);
+    esperar(m, 52);
+    esperar(m, 8);
+    expect(m.pedido, isNotNull); // um novo
+    expect(m.pedidosFeitos, 0);
+  });
+
+  test('áreas abertas, frutas e pedidos ficam salvos', () {
+    final m = Mundo(Random(1))
+      ..areas.addAll([Area.pomar, Area.parque])
+      ..frutasColhidas = 12
+      ..pedidosFeitos = 3;
+    final n = Mundo(Random(2))..carregar(m.paraJson(DateTime.now()), DateTime.now());
+    expect(n.areas, {Area.praca, Area.pomar, Area.parque});
+    expect(n.frutasColhidas, 12);
+    expect(n.pedidosFeitos, 3);
   });
 }
