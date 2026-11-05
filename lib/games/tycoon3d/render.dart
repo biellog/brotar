@@ -8,8 +8,14 @@ import 'mundo.dart';
 
 const _peles = [Color(0xFFF1C27D), Color(0xFFE0AC69), Color(0xFFC68642), Color(0xFF8D5524), Color(0xFFFFDBAC)];
 const _camisas = [
-  Color(0xFF4CC9F0), Color(0xFFFF6FA5), Color(0xFF7BD389), Color(0xFFB98CF0),
-  Color(0xFFFF9F1C), Color(0xFF3A86FF), Color(0xFFF94144), Color(0xFF90BE6D),
+  Color(0xFF4CC9F0),
+  Color(0xFFFF6FA5),
+  Color(0xFF7BD389),
+  Color(0xFFB98CF0),
+  Color(0xFFFF9F1C),
+  Color(0xFF3A86FF),
+  Color(0xFFF94144),
+  Color(0xFF90BE6D),
 ];
 
 class _Desenho {
@@ -67,13 +73,15 @@ class PintorMundo extends CustomPainter {
   void paint(Canvas c, Size s) {
     _iso = isoPara(s, m);
     _rotulos.clear();
-    c.drawRect(Offset.zero & s,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF7EC8F2), Color(0xFFCDEBFA)],
-          ).createShader(Offset.zero & s));
+    c.drawRect(
+      Offset.zero & s,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF7EC8F2), Color(0xFFCDEBFA)],
+        ).createShader(Offset.zero & s),
+    );
     _ilha(c);
     _chao(c);
     _escritorioChao(c);
@@ -105,8 +113,15 @@ class PintorMundo extends CustomPainter {
     for (final a in m.ajudantes) {
       lista.add(_Desenho(a.x + a.y + 0.01, (c) => _pessoa(c, a, const Color(0xFF2A9D8F), _peles[1], chef: true)));
     }
-    lista.add(_Desenho(m.jogador.x + m.jogador.y + 0.02,
-        (c) => _pessoa(c, m.jogador, const Color(0xFFFF9F1C), _peles[0], eu: true, sentado: m.sentado)));
+    for (final a in m.amigos.values) {
+      lista.add(_Desenho(a.x + a.y + 0.015, (c) => _amigo(c, a)));
+    }
+    lista.add(
+      _Desenho(
+        m.jogador.x + m.jogador.y + 0.02,
+        (c) => _pessoa(c, m.jogador, const Color(0xFFFF9F1C), _peles[0], eu: true, sentado: m.sentado),
+      ),
+    );
     lista.sort((a, b) => a.prof.compareTo(b.prof));
     for (final d in lista) {
       d.pintar(c);
@@ -116,11 +131,14 @@ class PintorMundo extends CustomPainter {
       _texto(c, r.texto, r.pos, r.tam, r.cor, fundo: r.fundo);
     }
     if (joyOrigem != null && joyPonto != null) {
-      c.drawCircle(joyOrigem!, 58,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..color = Colors.white.withValues(alpha: 0.6));
+      c.drawCircle(
+        joyOrigem!,
+        58,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..color = Colors.white.withValues(alpha: 0.6),
+      );
       final v = joyPonto! - joyOrigem!;
       final ponta = joyOrigem! + (v.distance > 58 ? v / v.distance * 58 : v);
       c.drawCircle(ponta, 24, Paint()..color = Colors.white.withValues(alpha: 0.45));
@@ -132,8 +150,18 @@ class PintorMundo extends CustomPainter {
   // ---------------- primitivas ----------------
   void _poligono(Canvas c, List<Offset> pts, Paint p) => c.drawPath(Path()..addPolygon(pts, true), p);
 
-  void _caixa(Canvas c, double x, double y, double w, double d, double z, double h, Color cor,
-      {Color? topo, double bordas = 0.12}) {
+  void _caixa(
+    Canvas c,
+    double x,
+    double y,
+    double w,
+    double d,
+    double z,
+    double h,
+    Color cor, {
+    Color? topo,
+    double bordas = 0.12,
+  }) {
     final i = _iso;
     final t1 = i.p(x, y, z + h), t2 = i.p(x + w, y, z + h), t3 = i.p(x + w, y + d, z + h), t4 = i.p(x, y + d, z + h);
     _poligono(c, [i.p(x, y + d, z), i.p(x + w, y + d, z), t3, t4], Paint()..color = cor);
@@ -141,36 +169,44 @@ class PintorMundo extends CustomPainter {
     _poligono(c, [t1, t2, t3, t4], Paint()..color = topo ?? _claro(cor, 0.25));
     if (bordas > 0) {
       _poligono(
-          c,
-          [t1, t2, t3, t4],
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1
-            ..color = Colors.black.withValues(alpha: bordas));
+        c,
+        [t1, t2, t3, t4],
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = Colors.black.withValues(alpha: bordas),
+      );
     }
   }
 
   void _sombra(Canvas c, double x, double y, double raio) {
-    c.drawOval(Rect.fromCenter(center: _iso.p(x, y), width: _iso.tw * raio, height: _iso.th * raio),
-        Paint()..color = Colors.black.withValues(alpha: 0.22));
+    c.drawOval(
+      Rect.fromCenter(center: _iso.p(x, y), width: _iso.tw * raio, height: _iso.th * raio),
+      Paint()..color = Colors.black.withValues(alpha: 0.22),
+    );
   }
 
   void _texto(Canvas c, String s, Offset centro, double tam, Color cor, {Color? fundo}) {
     final tp = TextPainter(
       text: TextSpan(
-          text: s,
-          style: TextStyle(
-              fontSize: tam,
-              fontWeight: FontWeight.w900,
-              color: cor,
-              shadows: fundo == null ? const [Shadow(blurRadius: 3, color: Colors.black54)] : null)),
+        text: s,
+        style: TextStyle(
+          fontSize: tam,
+          fontWeight: FontWeight.w900,
+          color: cor,
+          shadows: fundo == null ? const [Shadow(blurRadius: 3, color: Colors.black54)] : null,
+        ),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     if (fundo != null) {
       c.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromCenter(center: centro, width: tp.width + 14, height: tp.height + 6), const Radius.circular(9)),
-          Paint()..color = fundo);
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: centro, width: tp.width + 14, height: tp.height + 6),
+          const Radius.circular(9),
+        ),
+        Paint()..color = fundo,
+      );
     }
     tp.paint(c, centro - Offset(tp.width / 2, tp.height / 2));
   }
@@ -179,10 +215,18 @@ class PintorMundo extends CustomPainter {
   void _ilha(Canvas c) {
     final i = _iso;
     const h = 0.6;
-    _poligono(c, [i.p(0, alturaMapa), i.p(larguraMapa, alturaMapa), i.p(larguraMapa, alturaMapa, -h), i.p(0, alturaMapa, -h)],
-        Paint()..color = const Color(0xFF8D6E4A));
-    _poligono(c, [i.p(larguraMapa, 0), i.p(larguraMapa, alturaMapa), i.p(larguraMapa, alturaMapa, -h), i.p(larguraMapa, 0, -h)],
-        Paint()..color = const Color(0xFF6D5235));
+    _poligono(c, [
+      i.p(0, alturaMapa),
+      i.p(larguraMapa, alturaMapa),
+      i.p(larguraMapa, alturaMapa, -h),
+      i.p(0, alturaMapa, -h),
+    ], Paint()..color = const Color(0xFF8D6E4A));
+    _poligono(c, [
+      i.p(larguraMapa, 0),
+      i.p(larguraMapa, alturaMapa),
+      i.p(larguraMapa, alturaMapa, -h),
+      i.p(larguraMapa, 0, -h),
+    ], Paint()..color = const Color(0xFF6D5235));
   }
 
   void _chao(Canvas c) {
@@ -201,8 +245,12 @@ class PintorMundo extends CustomPainter {
         } else {
           cor = (x + y).isEven ? const Color(0xFF7CC66B) : const Color(0xFF71BA60);
         }
-        _poligono(c, [i.p(x * 1.0, y * 1.0), i.p(x + 1.0, y * 1.0), i.p(x + 1.0, y + 1.0), i.p(x * 1.0, y + 1.0)],
-            Paint()..color = cor);
+        _poligono(c, [
+          i.p(x * 1.0, y * 1.0),
+          i.p(x + 1.0, y * 1.0),
+          i.p(x + 1.0, y + 1.0),
+          i.p(x * 1.0, y + 1.0),
+        ], Paint()..color = cor);
       }
     }
     final faixa = Paint()
@@ -218,12 +266,13 @@ class PintorMundo extends CustomPainter {
     const x0 = 11.4, y0 = 11.2, x1 = 15.2, y1 = 15.2;
     _poligono(c, [_iso.p(x0, y0), _iso.p(x1, y0), _iso.p(x1, y1), _iso.p(x0, y1)], Paint()..color = const Color(0xFF3F5B8C));
     _poligono(
-        c,
-        [_iso.p(x0 + 0.15, y0 + 0.15), _iso.p(x1 - 0.15, y0 + 0.15), _iso.p(x1 - 0.15, y1 - 0.15), _iso.p(x0 + 0.15, y1 - 0.15)],
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = const Color(0xFFFFC23D).withValues(alpha: 0.7));
+      c,
+      [_iso.p(x0 + 0.15, y0 + 0.15), _iso.p(x1 - 0.15, y0 + 0.15), _iso.p(x1 - 0.15, y1 - 0.15), _iso.p(x0 + 0.15, y1 - 0.15)],
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFFFFC23D).withValues(alpha: 0.7),
+    );
     _rotulo(_iso.p((x0 + x1) / 2, y0 + 0.2, 0.05), '💻 GERÊNCIA', 12, Colors.white, fundo: const Color(0xCC1E3A6E));
   }
 
@@ -245,13 +294,14 @@ class PintorMundo extends CustomPainter {
     for (final (dx, dy, k) in [(0.0, 0.0, 1.0), (-0.45, 0.25, 0.75), (0.45, 0.25, 0.75), (0.0, -0.4, 0.8)]) {
       final ctr = topo + Offset(dx * r, dy * r);
       c.drawCircle(
-          ctr,
-          r * k,
-          Paint()
-            ..shader = const RadialGradient(
-              center: Alignment(-0.35, -0.45),
-              colors: [Color(0xFF8BD66F), Color(0xFF3E8E41)],
-            ).createShader(Rect.fromCircle(center: ctr, radius: r * k)));
+        ctr,
+        r * k,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-0.35, -0.45),
+            colors: [Color(0xFF8BD66F), Color(0xFF3E8E41)],
+          ).createShader(Rect.fromCircle(center: ctr, radius: r * k)),
+      );
     }
     if (alfa < 1) c.restore();
   }
@@ -269,11 +319,13 @@ class PintorMundo extends CustomPainter {
     final ctr = _iso.p(x + 0.8, y + 0.8, 0.32);
     for (var k = 0; k < 3; k++) {
       final f = (t * 0.6 + k / 3) % 1;
-      c.drawOval(Rect.fromCenter(center: ctr, width: _iso.tw * 1.2 * f, height: _iso.th * 1.2 * f),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5
-            ..color = Colors.white.withValues(alpha: 0.7 * (1 - f)));
+      c.drawOval(
+        Rect.fromCenter(center: ctr, width: _iso.tw * 1.2 * f, height: _iso.th * 1.2 * f),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = Colors.white.withValues(alpha: 0.7 * (1 - f)),
+      );
     }
     _caixa(c, x + 0.7, y + 0.7, 0.2, 0.2, 0.32, 0.6, const Color(0xFFCFD8DC), bordas: 0);
     for (var k = 0; k < 6; k++) {
@@ -292,8 +344,12 @@ class PintorMundo extends CustomPainter {
     final mx = mesa.x + 0.3, my = mesa.y + 0.55;
     _caixa(c, mx, my, 0.08, 0.7, 0.7, 0.55, const Color(0xFF263238), bordas: 0);
     final brilho = 0.75 + 0.25 * sin(t * 3);
-    _poligono(c, [_iso.p(mx, my + 0.06, 0.76), _iso.p(mx, my + 0.64, 0.76), _iso.p(mx, my + 0.64, 1.19), _iso.p(mx, my + 0.06, 1.19)],
-        Paint()..color = Color.lerp(const Color(0xFF1565C0), const Color(0xFF4FC3F7), brilho)!);
+    _poligono(c, [
+      _iso.p(mx, my + 0.06, 0.76),
+      _iso.p(mx, my + 0.64, 0.76),
+      _iso.p(mx, my + 0.64, 1.19),
+      _iso.p(mx, my + 0.06, 1.19),
+    ], Paint()..color = Color.lerp(const Color(0xFF1565C0), const Color(0xFF4FC3F7), brilho)!);
     _caixa(c, mesa.x + 0.08, my + 0.1, 0.18, 0.5, 0.7, 0.03, const Color(0xFF424242), bordas: 0); // teclado
     pintor.desenhar(c, '🧃', _iso.tw * 0.16, _iso.p(mx, my + 0.35, 0.98));
   }
@@ -339,30 +395,52 @@ class PintorMundo extends CustomPainter {
     const listras = 6;
     for (var k = 0; k < listras; k++) {
       final x0 = x - 0.1 + k * 1.6 / listras, x1 = x0 + 1.6 / listras;
-      _poligono(c, [_iso.p(x0, y - 0.1, 1.5), _iso.p(x1, y - 0.1, 1.5), _iso.p(x1, y + 1.5, 1.5), _iso.p(x0, y + 1.5, 1.5)],
-          Paint()..color = k.isEven ? cor : Colors.white);
-      _poligono(c, [_iso.p(x0, y + 1.5, 1.5), _iso.p(x1, y + 1.5, 1.5), _iso.p(x1, y + 1.5, 1.32), _iso.p(x0, y + 1.5, 1.32)],
-          Paint()..color = k.isEven ? _escuro(cor, 0.2) : const Color(0xFFE0E0E0));
+      _poligono(c, [
+        _iso.p(x0, y - 0.1, 1.5),
+        _iso.p(x1, y - 0.1, 1.5),
+        _iso.p(x1, y + 1.5, 1.5),
+        _iso.p(x0, y + 1.5, 1.5),
+      ], Paint()..color = k.isEven ? cor : Colors.white);
+      _poligono(c, [
+        _iso.p(x0, y + 1.5, 1.5),
+        _iso.p(x1, y + 1.5, 1.5),
+        _iso.p(x1, y + 1.5, 1.32),
+        _iso.p(x0, y + 1.5, 1.32),
+      ], Paint()..color = k.isEven ? _escuro(cor, 0.2) : const Color(0xFFE0E0E0));
     }
-    _poligono(c, [_iso.p(x + 1.5, y - 0.1, 1.5), _iso.p(x + 1.5, y + 1.5, 1.5), _iso.p(x + 1.5, y + 1.5, 1.32), _iso.p(x + 1.5, y - 0.1, 1.32)],
-        Paint()..color = _escuro(cor, 0.35));
+    _poligono(c, [
+      _iso.p(x + 1.5, y - 0.1, 1.5),
+      _iso.p(x + 1.5, y + 1.5, 1.5),
+      _iso.p(x + 1.5, y + 1.5, 1.32),
+      _iso.p(x + 1.5, y - 0.1, 1.32),
+    ], Paint()..color = _escuro(cor, 0.35));
     final topo = _iso.p(b.x, b.y, 2.15 + 0.08 * sin(t * 2.5 + b.indice));
     c.drawCircle(topo, _iso.tw * 0.32, Paint()..color = Colors.white.withValues(alpha: 0.35));
     pintor.desenhar(c, b.suco.emoji, _iso.tw * 0.5, topo);
     final cheia = b.estoque >= m.capacidadeBarraca(b);
-    _rotulo(_iso.p(b.x, b.y, 1.75), '${b.estoque}/${m.capacidadeBarraca(b)} · nv ${b.nivel}', 11, cheia ? const Color(0xFFFFE08A) : Colors.white,
-        fundo: Colors.black54);
+    _rotulo(
+      _iso.p(b.x, b.y, 1.75),
+      '${b.estoque}/${m.capacidadeBarraca(b)} · nv ${b.nivel}',
+      11,
+      cheia ? const Color(0xFFFFE08A) : Colors.white,
+      fundo: Colors.black54,
+    );
   }
 
   void _copo(Canvas c, Offset base, Color cor, double w) {
     final r = Rect.fromLTWH(base.dx - w / 2, base.dy - w * 1.25, w, w * 1.25);
-    c.drawRRect(RRect.fromRectAndCorners(r, bottomLeft: Radius.circular(w * 0.25), bottomRight: Radius.circular(w * 0.25)),
-        Paint()..color = cor);
+    c.drawRRect(
+      RRect.fromRectAndCorners(r, bottomLeft: Radius.circular(w * 0.25), bottomRight: Radius.circular(w * 0.25)),
+      Paint()..color = cor,
+    );
     c.drawRect(Rect.fromLTWH(r.left - 1, r.top - 2, w + 2, 3), Paint()..color = Colors.white);
-    c.drawLine(Offset(base.dx + w * 0.15, r.top - 2), Offset(base.dx + w * 0.35, r.top - w * 0.6),
-        Paint()
-          ..strokeWidth = 1.6
-          ..color = const Color(0xFFFF4D6D));
+    c.drawLine(
+      Offset(base.dx + w * 0.15, r.top - 2),
+      Offset(base.dx + w * 0.35, r.top - w * 0.6),
+      Paint()
+        ..strokeWidth = 1.6
+        ..color = const Color(0xFFFF4D6D),
+    );
   }
 
   void _balcao(Canvas c) {
@@ -370,8 +448,13 @@ class PintorMundo extends CustomPainter {
     _caixa(c, balcao.x, balcao.y, balcao.w, balcao.d, 0, 0.85, const Color(0xFF8D6E63), topo: const Color(0xFFFFF3E0));
     _caixa(c, balcao.x + balcao.w - 0.6, balcao.y + 0.15, 0.45, 0.45, 0.85, 0.3, const Color(0xFF455A64));
     pintor.desenhar(c, '💰', _iso.tw * 0.3, _iso.p(balcao.x + balcao.w - 0.38, balcao.y + 0.38, 1.4));
-    _rotulo(_iso.p(balcao.x + balcao.w / 2, balcao.y + balcao.d, 0.4), 'CAIXA · ENTREGUE AQUI', 10, Colors.white,
-        fundo: const Color(0xCC5D4037));
+    _rotulo(
+      _iso.p(balcao.x + balcao.w / 2, balcao.y + balcao.d, 0.4),
+      'CAIXA · ENTREGUE AQUI',
+      10,
+      Colors.white,
+      fundo: const Color(0xCC5D4037),
+    );
   }
 
   void _placa(Canvas c, Placa pl) {
@@ -380,26 +463,38 @@ class PintorMundo extends CustomPainter {
     final ctr = _iso.p(pl.x, pl.y);
     final pulso = 0.5 + 0.5 * sin(t * 4);
     final tam = pl.tipo == TipoPlaca.abrir ? 0.55 : 0.42;
-    List<Offset> diamante(double k) =>
-        [_iso.p(pl.x - k, pl.y - k), _iso.p(pl.x + k, pl.y - k), _iso.p(pl.x + k, pl.y + k), _iso.p(pl.x - k, pl.y + k)];
+    List<Offset> diamante(double k) => [
+      _iso.p(pl.x - k, pl.y - k),
+      _iso.p(pl.x + k, pl.y - k),
+      _iso.p(pl.x + k, pl.y + k),
+      _iso.p(pl.x - k, pl.y + k),
+    ];
     final pode = m.dinheiro > 0;
-    _poligono(c, diamante(tam),
-        Paint()..color = (pode ? const Color(0xFF1FAF7A) : const Color(0xFF607D8B)).withValues(alpha: 0.4 + 0.15 * pulso));
+    _poligono(
+      c,
+      diamante(tam),
+      Paint()..color = (pode ? const Color(0xFF1FAF7A) : const Color(0xFF607D8B)).withValues(alpha: 0.4 + 0.15 * pulso),
+    );
     if (prog > 0) _poligono(c, diamante(tam * prog), Paint()..color = const Color(0xFFFFC23D).withValues(alpha: 0.8));
     _poligono(
-        c,
-        diamante(tam),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5
-          ..color = Colors.white.withValues(alpha: 0.9));
+      c,
+      diamante(tam),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = Colors.white.withValues(alpha: 0.9),
+    );
     pintor.desenhar(c, m.icone(pl), _iso.tw * 0.3, ctr - Offset(0, _iso.th * 0.1));
     final nome = pl.tipo == TipoPlaca.abrir
         ? 'Abrir ${sucos[pl.alvo].nome}'
         : '${sucos[pl.alvo].emoji} nv ${m.barracas[pl.alvo].nivel + 1}';
-    _rotulo(ctr + Offset(0, _iso.th * (tam + 0.35)), '$nome · ${_curto(custo - pl.pago)}', 11,
-        pl.tipo == TipoPlaca.abrir ? const Color(0xFFFFE08A) : Colors.white,
-        fundo: Colors.black.withValues(alpha: 0.7));
+    _rotulo(
+      ctr + Offset(0, _iso.th * (tam + 0.35)),
+      '$nome · ${_curto(custo - pl.pago)}',
+      11,
+      pl.tipo == TipoPlaca.abrir ? const Color(0xFFFFE08A) : Colors.white,
+      fundo: Colors.black.withValues(alpha: 0.7),
+    );
   }
 
   // ---------------- pessoas ----------------
@@ -407,14 +502,19 @@ class PintorMundo extends CustomPainter {
     final base = _iso.p(p.x, p.y, sentado ? 0.33 : 0);
     final u = _iso.tw / 64;
     if (eu && !sentado) {
-      c.drawOval(Rect.fromCenter(center: base, width: 44 * u, height: 22 * u),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.5
-            ..color = Colors.white.withValues(alpha: 0.8));
+      c.drawOval(
+        Rect.fromCenter(center: base, width: 44 * u, height: 22 * u),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = Colors.white.withValues(alpha: 0.8),
+      );
     }
     if (!sentado) {
-      c.drawOval(Rect.fromCenter(center: base, width: 30 * u, height: 12 * u), Paint()..color = Colors.black.withValues(alpha: 0.25));
+      c.drawOval(
+        Rect.fromCenter(center: base, width: 30 * u, height: 12 * u),
+        Paint()..color = Colors.black.withValues(alpha: 0.25),
+      );
     }
     c.save();
     // vira para o lado em que anda
@@ -428,8 +528,14 @@ class PintorMundo extends CustomPainter {
     if (sentado) {
       c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(-7 * u, -6 * u, 14 * u, 6 * u), Radius.circular(2 * u)), perna);
     } else {
-      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(-7 * u, -14 * u + passo * 4 * u, 5 * u, 14 * u), Radius.circular(2 * u)), perna);
-      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(2 * u, -14 * u - passo * 4 * u, 5 * u, 14 * u), Radius.circular(2 * u)), perna);
+      c.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(-7 * u, -14 * u + passo * 4 * u, 5 * u, 14 * u), Radius.circular(2 * u)),
+        perna,
+      );
+      c.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(2 * u, -14 * u - passo * 4 * u, 5 * u, 14 * u), Radius.circular(2 * u)),
+        perna,
+      );
       c.drawOval(Rect.fromLTWH(-8 * u, -2 * u + passo * 4 * u, 8 * u, 4 * u), Paint()..color = const Color(0xFF212121));
       c.drawOval(Rect.fromLTWH(2 * u, -2 * u - passo * 4 * u, 8 * u, 4 * u), Paint()..color = const Color(0xFF212121));
     }
@@ -437,8 +543,10 @@ class PintorMundo extends CustomPainter {
     c.translate(corpo.dx, corpo.dy - 14 * u);
     c.rotate(inclina);
     final tronco = Rect.fromCenter(center: Offset(0, -10 * u), width: 20 * u, height: 22 * u);
-    c.drawRRect(RRect.fromRectAndRadius(tronco, Radius.circular(7 * u)),
-        Paint()..shader = LinearGradient(colors: [_claro(camisa, 0.2), _escuro(camisa, 0.15)]).createShader(tronco));
+    c.drawRRect(
+      RRect.fromRectAndRadius(tronco, Radius.circular(7 * u)),
+      Paint()..shader = LinearGradient(colors: [_claro(camisa, 0.2), _escuro(camisa, 0.15)]).createShader(tronco),
+    );
     final carregando = p.carga.isNotEmpty || sentado;
     final braco = Paint()
       ..strokeWidth = 4.5 * u
@@ -449,8 +557,8 @@ class PintorMundo extends CustomPainter {
       final mao = sentado
           ? Offset(lado * 6 * u + 8 * u, -10 * u) // digitando
           : carregando
-              ? Offset(lado * 2 * u, -14 * u)
-              : Offset(lado * 3 * u, 12 * u - lado * passo * 4 * u);
+          ? Offset(lado * 2 * u, -14 * u)
+          : Offset(lado * 3 * u, 12 * u - lado * passo * 4 * u);
       c.drawLine(ombro, ombro + mao, braco);
     }
     final cabeca = Offset(0, -29 * u);
@@ -458,19 +566,37 @@ class PintorMundo extends CustomPainter {
     c.drawArc(Rect.fromCircle(center: cabeca, radius: 9.5 * u), pi, pi, true, Paint()..color = const Color(0xFF3E2723));
     c.drawCircle(cabeca + Offset(1 * u, 1 * u), 1.4 * u, Paint()..color = Colors.black);
     c.drawCircle(cabeca + Offset(5 * u, 1 * u), 1.4 * u, Paint()..color = Colors.black);
-    c.drawArc(Rect.fromCenter(center: cabeca + Offset(3 * u, 4 * u), width: 6 * u, height: 3 * u), 0, pi, false,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2 * u
-          ..color = Colors.black54);
+    c.drawArc(
+      Rect.fromCenter(center: cabeca + Offset(3 * u, 4 * u), width: 6 * u, height: 3 * u),
+      0,
+      pi,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2 * u
+        ..color = Colors.black54,
+    );
     if (chef) {
-      c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: cabeca - Offset(0, 10 * u), width: 16 * u, height: 9 * u), Radius.circular(4 * u)),
-          Paint()..color = Colors.white);
+      c.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: cabeca - Offset(0, 10 * u), width: 16 * u, height: 9 * u),
+          Radius.circular(4 * u),
+        ),
+        Paint()..color = Colors.white,
+      );
     }
     if (eu) {
-      c.drawArc(Rect.fromCircle(center: cabeca - Offset(0, 1 * u), radius: 10 * u), pi, pi, true, Paint()..color = const Color(0xFFE85D04));
-      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cabeca.dx - 2 * u, cabeca.dy - 3 * u, 14 * u, 3.5 * u), Radius.circular(2 * u)),
-          Paint()..color = const Color(0xFFE85D04));
+      c.drawArc(
+        Rect.fromCircle(center: cabeca - Offset(0, 1 * u), radius: 10 * u),
+        pi,
+        pi,
+        true,
+        Paint()..color = const Color(0xFFE85D04),
+      );
+      c.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(cabeca.dx - 2 * u, cabeca.dy - 3 * u, 14 * u, 3.5 * u), Radius.circular(2 * u)),
+        Paint()..color = const Color(0xFFE85D04),
+      );
     }
     c.restore();
     c.restore();
@@ -481,8 +607,21 @@ class PintorMundo extends CustomPainter {
       _copo(c, cabecaTela - Offset(-balanco, 14 * u + k * 11 * u), Color(sucos[p.carga[k]].cor), 11 * u);
     }
     if (eu && p.carga.length >= m.capacidade && !sentado) {
-      _rotulo(cabecaTela - Offset(0, 24 * u + p.carga.length * 11 * u), 'CHEIO!', 11, const Color(0xFFFFE08A), fundo: Colors.black54);
+      _rotulo(
+        cabecaTela - Offset(0, 24 * u + p.carga.length * 11 * u),
+        'CHEIO!',
+        11,
+        const Color(0xFFFFE08A),
+        fundo: Colors.black54,
+      );
     }
+  }
+
+  void _amigo(Canvas c, Amigo a) {
+    _pessoa(c, a, Color(a.cor), _peles[a.id.hashCode.abs() % _peles.length], sentado: a.sentado);
+    final u = _iso.tw / 64;
+    final topo = _iso.p(a.x, a.y, a.sentado ? 0.33 : 0) - Offset(0, 62 * u + a.carga.length * 11 * u);
+    _rotulo(topo, '👤 ${a.nome}', 11, Colors.white, fundo: Color(a.cor).withValues(alpha: 0.85));
   }
 
   void _cliente(Canvas c, Cliente cl) {

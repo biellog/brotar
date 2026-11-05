@@ -31,8 +31,14 @@ const sucos = <Suco>[
 /// Barracas encostadas no FUNDO da praça (lado esquerdo do mapa), uma do lado da outra.
 const xBarracas = 1.8;
 const posicoesBarracas = <(double, double)>[
-  (xBarracas, 3.9), (xBarracas, 5.5), (xBarracas, 7.1), (xBarracas, 8.7),
-  (xBarracas, 10.3), (xBarracas, 11.9), (xBarracas, 13.5), (xBarracas, 15.1),
+  (xBarracas, 3.9),
+  (xBarracas, 5.5),
+  (xBarracas, 7.1),
+  (xBarracas, 8.7),
+  (xBarracas, 10.3),
+  (xBarracas, 11.9),
+  (xBarracas, 13.5),
+  (xBarracas, 15.1),
 ];
 
 /// A placa de cada barraca fica NA FRENTE dela (nunca no lugar da barraca).
@@ -166,10 +172,25 @@ class Pessoa {
   Pessoa(this.x, this.y, {this.ajudante = false});
 }
 
+/// Outro jogador no mesmo império (modo em grupo).
+class Amigo extends Pessoa {
+  final String id;
+  String nome;
+  int cor;
+  double alvoX, alvoY;
+  bool sentado = false;
+  double visto = 0; // segundos desde a última notícia dele
+  Amigo(this.id, this.nome, this.cor, double x, double y) : alvoX = x, alvoY = y, super(x, y);
+}
+
+const coresAmigos = [0xFF4CC9F0, 0xFFFF6FA5, 0xFF7BD389, 0xFFB98CF0, 0xFF3A86FF, 0xFFF94144];
+
 enum EstadoCliente { chegando, esperando, saindo }
 
 class Cliente {
+  int id = 0;
   double x, y;
+  double? alvoX, alvoY; // no modo espelho: para onde ele está indo
   final int quer;
   int faltam;
   final int aparencia;
@@ -213,6 +234,15 @@ class Mundo {
   double _proximoCliente = 1;
   double _poeira = 0;
   double relogio = 0;
+
+  /// Império em grupo: sem ajudantes (os amigos é que trabalham juntos).
+  bool grupo = false;
+
+  /// Espelho: outro celular roda o jogo; este só anda com o próprio boneco e mostra o que chega.
+  bool espelho = false;
+  final amigos = <String, Amigo>{};
+  final _eventosRede = <Evento>[];
+  int _idCliente = 0;
 
   static const custosAjudante = [150.0, 1500.0, 12000.0, 90000.0];
   static const maxNivelEquip = 5;
@@ -265,8 +295,9 @@ class Mundo {
 
   double custo(Placa p) => p.tipo == TipoPlaca.abrir ? sucos[p.alvo].custoAbrir : barracas[p.alvo].custoMelhorar;
 
-  String rotulo(Placa p) =>
-      p.tipo == TipoPlaca.abrir ? 'Abrir ${sucos[p.alvo].nome}' : 'Melhorar ${sucos[p.alvo].nome} → nv ${barracas[p.alvo].nivel + 1}';
+  String rotulo(Placa p) => p.tipo == TipoPlaca.abrir
+      ? 'Abrir ${sucos[p.alvo].nome}'
+      : 'Melhorar ${sucos[p.alvo].nome} → nv ${barracas[p.alvo].nivel + 1}';
 
   String icone(Placa p) => p.tipo == TipoPlaca.abrir ? sucos[p.alvo].emoji : '⬆️';
 
@@ -317,7 +348,7 @@ class Mundo {
   double get custoTenis => 90 * pow(3, nivelTenis).toDouble();
 
   bool contratarAjudante() {
-    if (dinheiro < custoAjudante) return false;
+    if (grupo || dinheiro < custoAjudante) return false;
     dinheiro -= custoAjudante;
     ajudantes.add(Pessoa(cadeira.x - 1.5, cadeira.y - 1.2, ajudante: true));
     return true;
@@ -337,6 +368,20 @@ class Mundo {
     return true;
   }
 
+  /// Uma compra do computador pelo nome (usada também pelos amigos, pela rede).
+  bool executar(String tipo, String k) {
+    T? achar<T extends Enum>(List<T> l) => l.where((e) => e.name == k).firstOrNull;
+    return switch (tipo) {
+      'boost' => achar(Boost.values) != null && comprarBoost(achar(Boost.values)!),
+      'emp' => achar(Melhoria.values) != null && comprarMelhoria(achar(Melhoria.values)!),
+      'hab' => achar(Habilidade.values) != null && subirHabilidade(achar(Habilidade.values)!),
+      'ajudante' => contratarAjudante(),
+      'mochila' => comprarMochila(),
+      'tenis' => comprarTenis(),
+      _ => false,
+    };
+  }
+
   /// Sai da cadeira (fecha o computador) e dá um passinho para fora dela.
   void levantar() {
     sentado = false;
@@ -348,16 +393,16 @@ class Mundo {
   Missao? get missaoAtual => missao < missoes.length ? missoes[missao] : null;
 
   double valorMissao(Missao m) => switch (m.tipo) {
-        TipoMissao.copos => copos.toDouble(),
-        TipoMissao.faturar => vendidoTotal,
-        TipoMissao.abrir => abertas.toDouble(),
-        TipoMissao.nivelLimonada => barracas[0].nivel.toDouble(),
-        TipoMissao.computador => usouComputador ? 1 : 0,
-        TipoMissao.ajudantes => ajudantes.length.toDouble(),
-        TipoMissao.boost => boostsUsados.toDouble(),
-        TipoMissao.empresa => totalMelhorias.toDouble(),
-        TipoMissao.mochila => nivelMochila.toDouble(),
-      };
+    TipoMissao.copos => copos.toDouble(),
+    TipoMissao.faturar => vendidoTotal,
+    TipoMissao.abrir => abertas.toDouble(),
+    TipoMissao.nivelLimonada => barracas[0].nivel.toDouble(),
+    TipoMissao.computador => usouComputador ? 1 : 0,
+    TipoMissao.ajudantes => ajudantes.length.toDouble(),
+    TipoMissao.boost => boostsUsados.toDouble(),
+    TipoMissao.empresa => totalMelhorias.toDouble(),
+    TipoMissao.mochila => nivelMochila.toDouble(),
+  };
 
   double get progressoMissao {
     final m = missaoAtual;
@@ -366,7 +411,12 @@ class Mundo {
 
   Evento? _checarMissao() {
     final m = missaoAtual;
-    if (m == null || valorMissao(m) < m.alvo) return null;
+    if (m == null) return null;
+    if (grupo && m.tipo == TipoMissao.ajudantes) {
+      missao++; // em grupo não tem ajudante: pula essa missão
+      return null;
+    }
+    if (valorMissao(m) < m.alvo) return null;
     missao++;
     dinheiro += m.premio;
     pontosHabilidade++;
@@ -375,11 +425,11 @@ class Mundo {
 
   // ---------------- colisão ----------------
   List<(double, double, double, double)> get _solidos => [
-        for (final b in barracas.where((b) => b.aberta)) (b.x - 0.7, b.y - 0.7, 1.4, 1.4),
-        (balcao.x, balcao.y, balcao.w, balcao.d),
-        (mesa.x, mesa.y, mesa.w, mesa.d),
-        (fonte.x, fonte.y, fonte.w, fonte.d),
-      ];
+    for (final b in barracas.where((b) => b.aberta)) (b.x - 0.7, b.y - 0.7, 1.4, 1.4),
+    (balcao.x, balcao.y, balcao.w, balcao.d),
+    (mesa.x, mesa.y, mesa.w, mesa.d),
+    (fonte.x, fonte.y, fonte.w, fonte.d),
+  ];
 
   bool _bate(double x, double y) {
     const r = 0.28;
@@ -403,6 +453,12 @@ class Mundo {
       boosts[b] = max(0, boosts[b]! - dt);
     }
     if (!sentado) _moverJogador(dt, dirX, dirY, eventos);
+    _moverAmigos(dt);
+    if (espelho) {
+      _cadeira(dt, eventos);
+      _moverClientesEspelho(dt);
+      return eventos;
+    }
     for (final b in barracas.where((b) => b.aberta && b.estoque < capacidadeBarraca(b))) {
       b.progresso += dt / tempoBarraca(b);
       if (b.progresso >= 1) {
@@ -413,11 +469,15 @@ class Mundo {
     for (final a in ajudantes) {
       _pensarAjudante(a, dt);
     }
-    for (final p in [if (!sentado) jogador, ...ajudantes]) {
+    final andando = [if (!sentado) jogador, ...amigos.values.where((a) => !a.sentado)];
+    for (final p in [...andando, ...ajudantes]) {
       eventos.addAll(_pegar(p, dt));
       eventos.addAll(_entregar(p, dt));
     }
-    if (!sentado) _placas(dt, eventos);
+    for (final p in andando) {
+      _placas(p, dt, eventos);
+    }
+    if (amigos.values.any((a) => a.sentado)) usouComputador = true;
     _cadeira(dt, eventos);
     // delivery: vende sozinho pelo app
     final d = nivelMelhoria(Melhoria.delivery);
@@ -429,6 +489,177 @@ class Mundo {
     _clientes(dt);
     final m = _checarMissao();
     if (m != null) eventos.add(m);
+    if (amigos.isNotEmpty) {
+      for (final e in eventos) {
+        if (e.tipo != TipoEvento.poeira &&
+            e.tipo != TipoEvento.sentou &&
+            e.tipo != TipoEvento.pegou &&
+            _eventosRede.length < 30) {
+          _eventosRede.add(e);
+        }
+      }
+    }
+    return eventos;
+  }
+
+  void _moverAmigos(double dt) {
+    for (final a in amigos.values) {
+      a.visto += dt;
+      final dx = a.alvoX - a.x, dy = a.alvoY - a.y;
+      final d = sqrt(dx * dx + dy * dy);
+      if (d > 3) {
+        a
+          ..x = a.alvoX
+          ..y = a.alvoY;
+      } else {
+        final k = min(1.0, dt * 10);
+        a
+          ..x += dx * k
+          ..y += dy * k;
+      }
+      if (d > 0.04) {
+        a.andando += dt;
+        if ((dx - dy).abs() > 0.05) a.olhandoEsquerda = (dx - dy) < 0;
+      } else {
+        a.andando = 0;
+      }
+    }
+  }
+
+  void _moverClientesEspelho(double dt) {
+    for (final c in clientes) {
+      final tx = c.alvoX ?? c.x, ty = c.alvoY ?? c.y;
+      final dx = tx - c.x, dy = ty - c.y;
+      final d = sqrt(dx * dx + dy * dy);
+      final passo = min(d, 2.6 * dt);
+      if (d > 0.02) {
+        c
+          ..x += dx / d * passo
+          ..y += dy / d * passo
+          ..andando += dt;
+      } else {
+        c.andando = 0;
+      }
+      if (c.feliz > 0) c.feliz = max(0, c.feliz - dt);
+    }
+  }
+
+  // ---------------- modo em grupo (rede) ----------------
+  /// Notícia de um amigo (posição que o celular dele mandou). Dados de fora: tudo validado.
+  void atualizarAmigo(String id, Map<String, dynamic> d) {
+    if (id.isEmpty || id.length > 40) return;
+    final x = d['x'], y = d['y'];
+    if (x is! num || y is! num || !x.isFinite || !y.isFinite) return;
+    final a =
+        amigos[id] ??
+        (amigos.length >= 7
+            ? null
+            : Amigo(id, 'Amigo', coresAmigos[amigos.length % coresAmigos.length], x.toDouble(), y.toDouble()));
+    if (a == null) return;
+    amigos[id] = a;
+    a
+      ..alvoX = x.toDouble().clamp(0.5, larguraMapa - 0.5)
+      ..alvoY = y.toDouble().clamp(2.6, alturaMapa - 0.5)
+      ..sentado = d['s'] == true
+      ..visto = 0;
+    final n = d['n'];
+    if (n is String && n.trim().isNotEmpty) a.nome = n.trim().length > 16 ? n.trim().substring(0, 16) : n.trim();
+    final c = d['o'];
+    if (c is int && coresAmigos.contains(c)) a.cor = c;
+  }
+
+  void removerAmigo(String id) => amigos.remove(id);
+
+  /// Foto do jogo inteiro para os amigos (o celular que roda o jogo manda ~4x por segundo).
+  Map<String, dynamic> estadoAoVivo(String meuId, String meuNome, int minhaCor) {
+    double r(double v) => (v * 100).roundToDouble() / 100;
+    final ev = [
+      for (final e in _eventosRede) [e.tipo.index, r(e.x), r(e.y), r(e.valor), e.suco, e.texto],
+    ];
+    _eventosRede.clear();
+    return {
+      'e': paraJson(DateTime.now()),
+      'cl': [
+        for (final c in clientes) [c.id, r(c.x), r(c.y), c.quer, c.faltam, c.aparencia, c.estado.index, r(c.feliz)],
+      ],
+      'js': {
+        meuId: {'x': r(jogador.x), 'y': r(jogador.y), 'c': jogador.carga, 's': sentado, 'n': meuNome, 'o': minhaCor},
+        for (final a in amigos.values)
+          a.id: {'x': r(a.alvoX), 'y': r(a.alvoY), 'c': a.carga, 's': a.sentado, 'n': a.nome, 'o': a.cor},
+      },
+      'ev': ev,
+    };
+  }
+
+  /// Aplica a foto que chegou do celular que roda o jogo. Devolve os eventos (sons, moedas).
+  List<Evento> aplicarAoVivo(Map<String, dynamic> d, String meuId) {
+    final e = d['e'];
+    if (e is Map) carregar(Map<String, dynamic>.from(e), DateTime.now());
+    final cl = d['cl'];
+    if (cl is List) {
+      final antigos = {for (final c in clientes) c.id: c};
+      clientes.clear();
+      for (final item in cl.take(30)) {
+        if (item is! List || item.length < 8 || item.take(3).any((v) => v is! num)) continue;
+        final id = (item[0] as num).toInt();
+        final quer = item[3] is int ? (item[3] as int).clamp(0, sucos.length - 1) : 0;
+        final c =
+            antigos[id] ??
+            Cliente((item[1] as num).toDouble(), (item[2] as num).toDouble(), quer, 1, item[5] is int ? item[5] as int : 0);
+        c
+          ..id = id
+          ..alvoX = (item[1] as num).toDouble()
+          ..alvoY = (item[2] as num).toDouble()
+          ..faltam = item[4] is int ? (item[4] as int).clamp(0, 9) : 1
+          ..estado = EstadoCliente.values[item[6] is int ? (item[6] as int).clamp(0, 2) : 0]
+          ..feliz = item[7] is num ? (item[7] as num).toDouble().clamp(0, 2) : 0;
+        clientes.add(c);
+      }
+    }
+    final js = d['js'];
+    if (js is Map) {
+      for (final ent in js.entries) {
+        final id = ent.key, v = ent.value;
+        if (id is! String || v is! Map) continue;
+        final dados = Map<String, dynamic>.from(v);
+        final carga = dados['c'];
+        final lista = carga is List
+            ? [
+                for (final k in carga.take(30))
+                  if (k is int && k >= 0 && k < sucos.length) k,
+              ]
+            : <int>[];
+        if (id == meuId) {
+          jogador.carga
+            ..clear()
+            ..addAll(lista);
+        } else {
+          atualizarAmigo(id, dados);
+          amigos[id]?.carga
+            ?..clear()
+            ..addAll(lista);
+        }
+      }
+      amigos.removeWhere((id, _) => !js.containsKey(id));
+    }
+    final ev = d['ev'];
+    final eventos = <Evento>[];
+    if (ev is List) {
+      for (final x in ev.take(30)) {
+        if (x is! List || x.length < 6 || x[0] is! int || x.skip(1).take(3).any((v) => v is! num)) continue;
+        final t = (x[0] as int).clamp(0, TipoEvento.values.length - 1);
+        eventos.add(
+          Evento(
+            TipoEvento.values[t],
+            (x[1] as num).toDouble(),
+            (x[2] as num).toDouble(),
+            valor: (x[3] as num).toDouble(),
+            suco: x[4] is int ? (x[4] as int).clamp(0, sucos.length - 1) : 0,
+            texto: x[5] is String ? (x[5] as String).substring(0, min(60, (x[5] as String).length)) : '',
+          ),
+        );
+      }
+    }
     return eventos;
   }
 
@@ -458,9 +689,9 @@ class Mundo {
     }
   }
 
-  void _placas(double dt, List<Evento> eventos) {
+  void _placas(Pessoa quem, double dt, List<Evento> eventos) {
     for (final pl in placas) {
-      if ((pl.x - jogador.x).abs() < 0.55 && (pl.y - jogador.y).abs() < 0.55 && dinheiro > 0) {
+      if ((pl.x - quem.x).abs() < 0.55 && (pl.y - quem.y).abs() < 0.55 && dinheiro > 0) {
         final c = custo(pl);
         final ritmo = max(c / 1.3, 20.0) * dt;
         final v = min(ritmo, min(dinheiro, c - pl.pago));
@@ -579,8 +810,7 @@ class Mundo {
     final maxClientes = 3 + abertas + nivel(Habilidade.marketing) + (promo ? 3 : 0);
     _proximoCliente -= dt * (promo ? 2 : 1);
     if (_proximoCliente <= 0 && clientes.length < maxClientes) {
-      _proximoCliente =
-          max(0.9, 4.0 - abertas * 0.35 - nivel(Habilidade.marketing) * 0.3) * (0.7 + _rnd.nextDouble() * 0.6);
+      _proximoCliente = max(0.9, 4.0 - abertas * 0.35 - nivel(Habilidade.marketing) * 0.3) * (0.7 + _rnd.nextDouble() * 0.6);
       final abertasL = barracas.where((b) => b.aberta).toList();
       var soma = 0;
       for (final b in abertasL) {
@@ -596,16 +826,24 @@ class Mundo {
         }
       }
       final daEsquerda = _rnd.nextBool();
-      clientes.add(Cliente(daEsquerda ? -0.5 : larguraMapa + 0.5, ruaY, quer, 1 + _rnd.nextInt(2), _rnd.nextInt(8)));
+      clientes.add(
+        Cliente(daEsquerda ? -0.5 : larguraMapa + 0.5, ruaY, quer, 1 + _rnd.nextInt(2), _rnd.nextInt(8))..id = ++_idCliente,
+      );
     }
     final vs = vagas;
-    final ocupadas = {for (final c in clientes) if (c.vaga >= 0 && c.estado != EstadoCliente.saindo) c.vaga};
+    final ocupadas = {
+      for (final c in clientes)
+        if (c.vaga >= 0 && c.estado != EstadoCliente.saindo) c.vaga,
+    };
     for (final c in clientes) {
       double tx, ty;
       switch (c.estado) {
         case EstadoCliente.chegando:
           if (c.vaga < 0) {
-            final livre = [for (var v = 0; v < vs.length; v++) if (!ocupadas.contains(v)) v].firstOrNull;
+            final livre = [
+              for (var v = 0; v < vs.length; v++)
+                if (!ocupadas.contains(v)) v,
+            ].firstOrNull;
             if (livre != null) {
               c.vaga = livre;
               ocupadas.add(livre);
@@ -661,23 +899,29 @@ class Mundo {
 
   // ---------------- salvar ----------------
   Map<String, dynamic> paraJson(DateTime agora) => {
-        'v': 2,
-        'dinheiro': dinheiro,
-        'vendido': vendidoTotal,
-        'copos': copos,
-        'mochila': nivelMochila,
-        'tenis': nivelTenis,
-        'ajudantes': ajudantes.length,
-        'pontos': pontosHabilidade,
-        'missao': missao,
-        'boosts': boostsUsados,
-        'pc': usouComputador,
-        'hab': {for (final e in habilidades.entries) e.key.name: e.value},
-        'emp': {for (final e in melhorias.entries) e.key.name: e.value},
-        'pagos': pagos,
-        'barracas': [for (final b in barracas) {'a': b.aberta, 'n': b.nivel, 'e': b.estoque}],
-        'salvoEm': agora.millisecondsSinceEpoch,
-      };
+    'v': 2,
+    'dinheiro': dinheiro,
+    'vendido': vendidoTotal,
+    'copos': copos,
+    'mochila': nivelMochila,
+    'tenis': nivelTenis,
+    'ajudantes': ajudantes.length,
+    'pontos': pontosHabilidade,
+    'missao': missao,
+    'boosts': boostsUsados,
+    'pc': usouComputador,
+    'hab': {for (final e in habilidades.entries) e.key.name: e.value},
+    'emp': {for (final e in melhorias.entries) e.key.name: e.value},
+    'pagos': pagos,
+    'bo': {
+      for (final e in boosts.entries)
+        if (e.value > 0) e.key.name: e.value.roundToDouble(),
+    },
+    'barracas': [
+      for (final b in barracas) {'a': b.aberta, 'n': b.nivel, 'e': b.estoque},
+    ],
+    'salvoEm': agora.millisecondsSinceEpoch,
+  };
 
   double carregar(Map<String, dynamic> j, DateTime agora) {
     double n(Object? v) => v is num && v.isFinite ? max(0, v.toDouble()) : 0;
@@ -699,8 +943,13 @@ class Mundo {
     for (final m in Melhoria.values) {
       melhorias[m] = emp is Map ? i(emp[m.name], m.maxNivel) : 0;
     }
-    ajudantes.clear();
-    for (var k = 0; k < i(j['ajudantes'], custosAjudante.length); k++) {
+    final bo = j['bo'];
+    for (final b in Boost.values) {
+      boosts[b] = bo is Map ? n(bo[b.name]).clamp(0, 900).toDouble() : 0;
+    }
+    final qtdAjudantes = grupo ? 0 : i(j['ajudantes'], custosAjudante.length);
+    if (ajudantes.length != qtdAjudantes) ajudantes.clear();
+    for (var k = ajudantes.length; k < qtdAjudantes; k++) {
       ajudantes.add(Pessoa(10.0 + k * 0.6, 6.4, ajudante: true));
     }
     pagos.clear();

@@ -13,6 +13,7 @@ import '../widgets/cartao_compartilhar.dart';
 import '../widgets/painel_gastos.dart';
 import 'checkin_sheet.dart';
 import '../games/brilha/brilha_screen.dart';
+import '../games/tycoon3d/tycoon3d_screen.dart';
 import 'jogos_tab.dart';
 import 'movimento.dart';
 import 'perfil_screen.dart';
@@ -37,15 +38,18 @@ class _HomeScreenState extends State<HomeScreen> {
       _iniciarAtualizacoes();
       _abrirSalaPendente();
       _usarConvitePendente();
+      _abrirImperioPendente();
     });
     LinksApp.salaPendente.addListener(_abrirSalaPendente);
     LinksApp.convitePendente.addListener(_usarConvitePendente);
+    LinksApp.imperioPendente.addListener(_abrirImperioPendente);
   }
 
   @override
   void dispose() {
     LinksApp.salaPendente.removeListener(_abrirSalaPendente);
     LinksApp.convitePendente.removeListener(_usarConvitePendente);
+    LinksApp.imperioPendente.removeListener(_abrirImperioPendente);
     super.dispose();
   }
 
@@ -58,6 +62,18 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => BrilhaScreen(salaInicial: sala),
+    ));
+  }
+
+  /// Link do Império do Suco em grupo: abre o império direto.
+  void _abrirImperioPendente() {
+    final c = LinksApp.imperioPendente.value;
+    if (c == null || !mounted) return;
+    LinksApp.imperioPendente.value = null;
+    Repo.log('link_aberto', {'tipo': 'imperio_grupo'});
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => Tycoon3dScreen(codigoGrupo: c),
     ));
   }
 

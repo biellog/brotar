@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 /// Links que abrem o app (vindos do site ou do WhatsApp):
 ///   ficasobrio://brilha?sala=K7Q2P  → entra na sala do Brilha Junto
 ///   ficasobrio://convite?c=K7Q2ZP   → usa o código de convite (+100 XP)
+///   ficasobrio://suco?c=K7Q2PMNX    → entra no Império do Suco em grupo
 class LinksApp {
   static final salaPendente = ValueNotifier<String?>(null);
   static final convitePendente = ValueNotifier<String?>(null);
+  static final imperioPendente = ValueNotifier<String?>(null);
   static bool _iniciado = false;
 
   static Future<void> iniciar() async {
@@ -33,6 +35,9 @@ class LinksApp {
       case 'convite':
         final c = (u.queryParameters['c'] ?? '').trim().toUpperCase();
         if (_codigo.hasMatch(c)) convitePendente.value = c;
+      case 'suco':
+        final c = (u.queryParameters['c'] ?? '').trim().toUpperCase();
+        if (RegExp(r'^[A-Z2-9]{8}$').hasMatch(c)) imperioPendente.value = c;
     }
   }
 }

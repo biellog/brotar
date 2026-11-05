@@ -42,3 +42,26 @@ jobs:
 
       - name: Aplicar migrações (criar tabelas, segurança e funções)
         run: supabase db push --remote --include-all --yes --password "$SUPABASE_DB_PASSWORD"
+
+      # Prova que o Império do Suco em grupo funciona como no site (chave pública, sem login)
+      # e que ninguém mexe nas tabelas por fora das funções.
+      - name: Conferir império em grupo
+        env:
+          CHAVE: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+        run: |
+          URL=$(echo "$URL_BRUTA" | sed -E 's#^(https://[^/]+).*#\1#')
+          sql() { jq -n --arg q "$1" '{query: $q}' | curl -fsS -X POST "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+                    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @-; }
+          rpc() { curl -sS -X POST "$URL/rest/v1/rpc/$1" -H "apikey: $CHAVE" -H "Authorization: Bearer $CHAVE" -H "Content-Type: application/json" -d "$2"; }
+          sql "insert into public.imperios_grupo (codigo, nome, atualizado_em) values ('CITESTE2', 'Teste CI', now() - interval '1 minute') on conflict (codigo) do update set atualizado_em = now() - interval '1 minute';" >/dev/null
+          trap 'sql "delete from public.imperios_grupo where codigo = '"'"'CITESTE2'"'"';" >/dev/null' EXIT
+          S=$(rpc salvar_imperio_grupo '{"p_codigo":"citeste2","p_estado":{"dinheiro":5}}'); echo "salvar: $S"
+          [ "$S" = "true" ] || { echo "::error::salvar_imperio_grupo não funcionou: $S"; exit 1; }
+          A=$(rpc abrir_imperio_grupo '{"p_codigo":"CITESTE2"}'); echo "abrir: $A"
+          [ "$(echo "$A" | jq -r '.estado.dinheiro')" = "5" ] || { echo "::error::abrir_imperio_grupo não devolveu o progresso"; exit 1; }
+          N=$(rpc abrir_imperio_grupo '{"p_codigo":"NAOEXIS2"}'); [ "$N" = "null" ] || { echo "::error::código inexistente devia dar null: $N"; exit 1; }
+          C=$(rpc criar_imperio_grupo '{"p_nome":"x"}'); echo "criar sem login: $C"
+          echo "$C" | grep -qiE 'permission|denied|42501|PGRST' || { echo "::error::criar sem login devia ser bloqueado"; exit 1; }
+          T=$(curl -sS "$URL/rest/v1/imperios_grupo?select=codigo" -H "apikey: $CHAVE" -H "Authorization: Bearer $CHAVE"); echo "tabela direto: $T"
+          echo "$T" | grep -q CITESTE2 && { echo "::error::a tabela de impérios está aberta para leitura direta"; exit 1; }
+          echo "OK: império em grupo salvo e aberto pelo código, e protegido."

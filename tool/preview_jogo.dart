@@ -10,6 +10,8 @@ import 'package:fica_sobrio/logic/movimento.dart';
 import 'package:fica_sobrio/screens/movimento.dart';
 import 'package:fica_sobrio/games/tempestade.dart';
 import 'package:fica_sobrio/games/tycoon3d/tycoon3d_screen.dart';
+import 'package:fica_sobrio/games/tycoon3d/tycoon_inicio.dart';
+import 'package:fica_sobrio/web_brilha.dart' as wb;
 import 'package:fica_sobrio/screens/jogos_tab.dart';
 import 'package:fica_sobrio/theme.dart';
 import 'package:fica_sobrio/widgets/cartao_compartilhar.dart';
@@ -29,6 +31,9 @@ Future<void> main() async {
     'jardim' => const JardimMagicoScreen(),
     'mandala' => const MandalaScreen(),
     'tycoon' => const Tycoon3dScreen(),
+    'tycoon_inicio' => const TycoonInicio(),
+    'suco_web' => const wb.SucoWebInicio(codigo: 'K7Q2PMNX'),
+    'suco_erro' => const Tycoon3dScreen(codigoGrupo: 'K7Q2PMNX'),
     'brilha' => const BrilhaScreen(),
     'cartao' => Scaffold(
         backgroundColor: Colors.white,
