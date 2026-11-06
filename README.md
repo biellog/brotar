@@ -27,6 +27,7 @@ O APK é compilado **pelo GitHub** — você não precisa instalar nada no compu
 | 🆘 SOS Fissura | Registra intensidade e gatilho, respiração 4-4-6, cronômetro, CVV 188, CAPS (136), AA/NA, SAMU 192 |
 | 📓 Check-in diário | Humor, nível de vontade, diário |
 | 💚 Recaída sem culpa | Recomeça só o contador; XP, nível e conquistas continuam |
+| 👥 Amigos | Adicione pelo código (o mesmo do convite), aceite pedidos, veja quem está **online agora** e chame para o Brilha Junto ou para um Império do Suco em grupo; o amigo recebe o convite na hora e entra com um toque. O amigo só vê seu primeiro nome e nível |
 | 🤝 Indique e ganhe | Código de convite: quem indica ganha 200 XP, quem entra 100 XP |
 | 📤 Compartilhar | Conquistas, recordes e dias sóbrio viram posts com o link do app |
 | 🔒 LGPD | Termo de consentimento + botão "Excluir minha conta" |
@@ -40,6 +41,7 @@ Tudo que a pessoa faz **dentro do app** fica gravado na conta dela:
 - `partidas` — pontos e duração de cada partida
 - `conquistas` — medalhas desbloqueadas
 - `imperios_grupo` / `imperio_membros` — impérios do Império do Suco em grupo (só pelas funções do servidor)
+- `amizades` / `convites_jogo` — amigos e convites para jogar (só pelas funções do servidor; cada um só lê os convites que recebeu)
 - `eventos` — **histórico de cada ação** (login, telas abertas, check-ins, partidas, compartilhamentos,
   ligações de ajuda…) junto com os **dados do aparelho** (marca, modelo, versão do Android, fuso)
 

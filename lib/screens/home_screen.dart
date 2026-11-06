@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:flutter/services.dart';
+
+import '../data/amigos.dart';
 import '../data/atualizacao.dart';
+import '../data/musica.dart';
 import '../data/instalador.dart';
 import '../data/links.dart';
 import '../data/notificacoes.dart';
@@ -14,6 +18,7 @@ import '../widgets/painel_gastos.dart';
 import 'checkin_sheet.dart';
 import '../games/brilha/brilha_screen.dart';
 import '../games/tycoon3d/tycoon3d_screen.dart';
+import 'amigos_screen.dart';
 import 'jogos_tab.dart';
 import 'movimento.dart';
 import 'perfil_screen.dart';
@@ -30,10 +35,15 @@ class _HomeScreenState extends State<HomeScreen> {
   int _aba = 0;
   int _versao = 0; // força recarregar a aba Início quando voltamos dela
   VersaoApp? _novaVersao;
+  late final AppLifecycleListener _ciclo;
 
   @override
   void initState() {
     super.initState();
+    // amigos: aparecer como online e receber convites para jogar
+    Amigos.conectar();
+    _ciclo = AppLifecycleListener(onShow: () => Amigos.visivel(true), onHide: () => Amigos.visivel(false));
+    Amigos.conviteRecebido.addListener(_mostrarConvite);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _iniciarAtualizacoes();
       _abrirSalaPendente();
@@ -50,6 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
     LinksApp.salaPendente.removeListener(_abrirSalaPendente);
     LinksApp.convitePendente.removeListener(_usarConvitePendente);
     LinksApp.imperioPendente.removeListener(_abrirImperioPendente);
+    Amigos.conviteRecebido.removeListener(_mostrarConvite);
+    _ciclo.dispose();
+    Amigos.desconectar();
     super.dispose();
   }
 
@@ -62,6 +75,41 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => BrilhaScreen(salaInicial: sala),
+    ));
+  }
+
+  /// Um amigo chamou para jogar: pergunta se quer entrar.
+  Future<void> _mostrarConvite() async {
+    final c = Amigos.conviteRecebido.value;
+    if (c == null || !mounted) return;
+    Amigos.conviteRecebido.value = null;
+    Musica.efeito(Efeito.tyGema);
+    HapticFeedback.heavyImpact();
+    final entrar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${c.jogo.emoji} ${c.deNome} te chamou!', textAlign: TextAlign.center),
+        content: Text(
+          c.jogo == JogoConvite.brilha
+              ? 'Bora brilhar juntos no ${c.jogo.nome}? A sala já está esperando.'
+              : 'Bora construir o império${c.detalhe.isEmpty ? '' : ' "${c.detalhe}"'} juntos no ${c.jogo.nome}?',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Agora não')),
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(110, 44)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Entrar'),
+          ),
+        ],
+      ),
+    );
+    Repo.log('amigos', {'acao': 'convite_recebido', 'jogo': c.jogo.name, 'entrou': entrar == true});
+    if (entrar != true || !mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => c.jogo == JogoConvite.brilha ? BrilhaScreen(salaInicial: c.codigo) : Tycoon3dScreen(codigoGrupo: c.codigo),
     ));
   }
 
@@ -389,6 +437,11 @@ class _InicioTabState extends State<InicioTab> {
             _Stat('🎮', '$_recorde', 'recorde'),
           ]),
           const SizedBox(height: 12),
+          // ------- Amigos -------
+          _CartaoAmigos(aoTocar: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AmigosScreen()));
+          }),
+          const SizedBox(height: 12),
           // ------- Novidade: jogo online -------
           _BannerBrilha(aoTocar: () {
             Repo.log('tela', {'nome': 'banner_brilha'});
@@ -552,6 +605,57 @@ class _BannerBrilha extends StatelessWidget {
             ),
             Icon(Icons.play_circle_fill, color: Color(0xFFFFC23D), size: 38),
           ]),
+        ),
+      );
+}
+
+/// Cartão "Amigos" da tela inicial (quantos estão online e pedidos novos).
+class _CartaoAmigos extends StatelessWidget {
+  final VoidCallback aoTocar;
+  const _CartaoAmigos({required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<List<Amigo>>(
+        valueListenable: Amigos.lista,
+        builder: (_, lista, _) => ValueListenableBuilder<Set<String>>(
+          valueListenable: Amigos.online,
+          builder: (_, online, _) {
+            final amigos = lista.where((a) => a.aceito).length;
+            final pedidos = lista.where((a) => a.pedidoRecebido).length;
+            final agora = lista.where((a) => a.aceito && online.contains(a.id)).toList();
+            final sub = pedidos > 0
+                ? '📩 $pedidos ${pedidos == 1 ? 'pedido novo' : 'pedidos novos'} de amizade'
+                : agora.isNotEmpty
+                    ? '${agora.take(3).map((a) => a.nome).join(', ')}${agora.length > 3 ? ' +${agora.length - 3}' : ''} ${agora.length == 1 ? 'está' : 'estão'} online: chame para jogar!'
+                    : amigos == 0
+                        ? 'Adicione amigos e jogue junto com eles'
+                        : '$amigos ${amigos == 1 ? 'amigo' : 'amigos'} · ninguém online agora';
+            return Card(
+              child: ListTile(
+                onTap: aoTocar,
+                leading: Stack(clipBehavior: Clip.none, children: [
+                  const Text('👥', style: TextStyle(fontSize: 32)),
+                  if (agora.isNotEmpty || pedidos > 0)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: pedidos > 0 ? Cores.perigo : const Color(0xFF3DDC84),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text('${pedidos > 0 ? pedidos : agora.length}',
+                            style: const TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                ]),
+                title: const Text('Amigos', style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle: Text(sub),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            );
+          },
         ),
       );
 }

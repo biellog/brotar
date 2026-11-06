@@ -1,5 +1,7 @@
 // Prévia dos jogos no navegador (sem Supabase), usada só para testes visuais.
+import 'package:fica_sobrio/data/amigos.dart' as am;
 import 'package:fica_sobrio/data/musica.dart';
+import 'package:fica_sobrio/screens/amigos_screen.dart';
 import 'package:fica_sobrio/games/bolhas.dart';
 import 'package:fica_sobrio/games/brilha/brilha_screen.dart';
 import 'package:fica_sobrio/games/comum.dart';
@@ -33,6 +35,17 @@ Future<void> main() async {
     'mandala' => const MandalaScreen(),
     'tycoon' => const Tycoon3dScreen(),
     'tycoon_inicio' => const TycoonInicio(),
+    'amigos' => Builder(builder: (_) {
+        am.Amigos.lista.value = const [
+          am.Amigo('a', 'Ana', 1200, 'aceito', false),
+          am.Amigo('b', 'Bruno', 300, 'aceito', true),
+          am.Amigo('c', 'Carla', 5200, 'aceito', false),
+          am.Amigo('d', 'Diego', 80, 'pendente', false),
+          am.Amigo('e', 'Eva', 40, 'pendente', true),
+        ];
+        am.Amigos.online.value = const {'a', 'c'};
+        return const AmigosScreen();
+      }),
     'tycoon_agito' => Tycoon3dScreen(
         agitoPrevia: TipoAgito.values.asNameMap()[Uri.base.queryParameters['agito'] ?? 'moedas'],
         posicaoPrevia: Uri.base.queryParameters['placa'] == '1'

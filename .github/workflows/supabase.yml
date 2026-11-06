@@ -65,3 +65,57 @@ jobs:
           T=$(curl -sS "$URL/rest/v1/imperios_grupo?select=codigo" -H "apikey: $CHAVE" -H "Authorization: Bearer $CHAVE"); echo "tabela direto: $T"
           echo "$T" | grep -q CITESTE2 && { echo "::error::a tabela de impérios está aberta para leitura direta"; exit 1; }
           echo "OK: império em grupo salvo e aberto pelo código, e protegido."
+
+      # Prova o fluxo de amigos no servidor: dois usuários de teste, pedido, aceite,
+      # convite só entre amigos; e que sem login nada funciona. Os usuários de teste são apagados no fim.
+      - name: Conferir amigos
+        env:
+          CHAVE: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+        run: |
+          URL=$(echo "$URL_BRUTA" | sed -E 's#^(https://[^/]+).*#\1#')
+          sql() { jq -n --arg q "$1" '{query: $q}' | curl -sS -X POST "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+                    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @-; }
+          A=00000000-0000-4000-8000-00000000c1a1; B=00000000-0000-4000-8000-00000000c1b2; C=00000000-0000-4000-8000-00000000c1c3
+          LIMPAR="delete from auth.users where id in ('$A','$B','$C');"
+          trap 'sql "$LIMPAR" >/dev/null' EXIT
+          sql "$LIMPAR" >/dev/null
+          R=$(sql "
+            insert into auth.users (id, email, aud, role) values
+              ('$A','ci-amigo-a@teste.invalid','authenticated','authenticated'),
+              ('$B','ci-amigo-b@teste.invalid','authenticated','authenticated'),
+              ('$C','ci-amigo-c@teste.invalid','authenticated','authenticated');
+            insert into public.perfis (id, nome) values ('$A','Ana Teste'),('$B','Bia Teste'),('$C','Caio Teste')
+              on conflict (id) do update set nome = excluded.nome;
+            do \$\$
+            declare r text; ok boolean; n int; cb text;
+            begin
+              select codigo_convite into cb from public.perfis where id = '$B';
+              perform set_config('request.jwt.claims', '{\"sub\":\"$A\",\"role\":\"authenticated\"}', true);
+              r := public.pedir_amizade(cb);              if r <> 'enviado' then raise exception 'pedir: %', r; end if;
+              ok := public.convidar_amigo('$B', 'brilha', 'K7Q2P');  if ok then raise exception 'convidou sem ser amigo'; end if;
+              perform set_config('request.jwt.claims', '{\"sub\":\"$B\",\"role\":\"authenticated\"}', true);
+              select count(*) into n from public.meus_amigos() where status = 'pendente' and not enviado_por_mim;
+              if n <> 1 then raise exception 'B não viu o pedido (%)', n; end if;
+              ok := public.responder_amizade('$A', true); if not ok then raise exception 'aceitar falhou'; end if;
+              perform set_config('request.jwt.claims', '{\"sub\":\"$A\",\"role\":\"authenticated\"}', true);
+              select count(*) into n from public.meus_amigos() where status = 'aceito' and nome = 'Bia';
+              if n <> 1 then raise exception 'A não vê B como amiga'; end if;
+              ok := public.convidar_amigo('$B', 'suco', 'K7Q2PMNX', 'Galera'); if not ok then raise exception 'convite falhou'; end if;
+              ok := public.convidar_amigo('$C', 'brilha', 'K7Q2P'); if ok then raise exception 'convidou estranho'; end if;
+              ok := public.convidar_amigo('$B', 'xadrez', 'K7Q2P'); if ok then raise exception 'jogo inválido aceito'; end if;
+              select count(*) into n from public.convites_jogo where para = '$B' and de_nome = 'Ana' and jogo = 'suco';
+              if n <> 1 then raise exception 'convite não gravou'; end if;
+              ok := public.remover_amizade('$B'); if not ok then raise exception 'remover falhou'; end if;
+            end;
+            \$\$;
+            select 'fluxo ok' as r;")
+          echo "$R"
+          echo "$R" | grep -q 'fluxo ok' || { echo "::error::fluxo de amigos falhou: $R"; exit 1; }
+          rpc() { curl -sS -X POST "$URL/rest/v1/rpc/$1" -H "apikey: $CHAVE" -H "Authorization: Bearer $CHAVE" -H "Content-Type: application/json" -d "$2"; }
+          for f in 'pedir_amizade {"p_codigo":"ABC123"}' 'meus_amigos {}' "convidar_amigo {\"p_para\":\"$B\",\"p_jogo\":\"brilha\",\"p_codigo\":\"K7Q2P\"}"; do
+            set -- $f; S=$(rpc "$1" "$2"); echo "$1 sem login: $S"
+            echo "$S" | grep -qiE 'permission|denied|42501' || { echo "::error::$1 funcionou sem login"; exit 1; }
+          done
+          T=$(curl -sS "$URL/rest/v1/convites_jogo?select=id" -H "apikey: $CHAVE" -H "Authorization: Bearer $CHAVE"); echo "convites sem login: $T"
+          echo "$T" | grep -q '"id"' && { echo "::error::convites legíveis sem login"; exit 1; }
+          echo "OK: amigos e convites funcionando e protegidos."
