@@ -726,7 +726,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                       ),
                       const SizedBox(height: 6),
                       Center(
-                        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _MissaoCompacta(m: _m)),
+                        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 440), child: _MissaoCompacta(m: _m)),
                       ),
                       _Pilulas(m: _m, tremer: _tremer),
                       const Spacer(),
@@ -740,14 +740,17 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                                 spacing: 6,
                                 runSpacing: 6,
                                 children: [
-                                  if (carga == 0) _Etiqueta('🥤 0 · ${_m.capacidade} de cada', Colors.white),
-                                  for (final e in _m.cargaPorSuco(_m.jogador).entries)
-                                    _Etiqueta('${sucos[e.key].emoji} ${e.value}/${_m.capacidade}',
-                                        e.value >= _m.capacidade ? _ouro : Colors.white),
-                                  _grupo
-                                      ? _Etiqueta('👥 ${1 + _m.amigos.length}', Colors.white)
-                                      : _Etiqueta('🧑‍🍳 ${_m.ajudantes.length}', Colors.white),
-                                  _Etiqueta('🏪 ${_m.abertas}/${sucos.length}', Colors.white),
+                                  // uma etiqueta só: total na mão e quais sucos já estão no limite
+                                  Builder(builder: (_) {
+                                    final cheios = [
+                                      for (final e in _m.cargaPorSuco(_m.jogador).entries)
+                                        if (e.value >= _m.capacidade) sucos[e.key].emoji,
+                                    ];
+                                    return _Etiqueta(
+                                      '🥤 $carga${cheios.isEmpty ? '' : ' · cheio ${cheios.take(4).join()}'}',
+                                      cheios.isEmpty ? Colors.white : _ouro,
+                                    );
+                                  }),
                                 ],
                               ),
                             ),
@@ -837,11 +840,11 @@ class _Etiqueta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(14)),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(12)),
     child: Text(
       texto,
-      style: TextStyle(color: cor, fontWeight: FontWeight.w900, fontSize: 15),
+      style: TextStyle(color: cor, fontWeight: FontWeight.w900, fontSize: 14),
     ),
   );
 }
@@ -1377,13 +1380,13 @@ class _MissaoCompacta extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('🎯 ', style: TextStyle(fontSize: 13)),
+              const Text('🎯 ', style: TextStyle(fontSize: 12)),
               Expanded(
                 child: Text(
                   mi.texto,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
                 ),
               ),
               Text(
@@ -1416,15 +1419,10 @@ class _Pilulas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final area = areaDe(m.jogador.x, m.jogador.y);
     final a = m.agito;
     final vip = m.clientes.where((c) => c.vip && c.estado != EstadoCliente.saindo).firstOrNull;
     final pe = m.pedido;
     final itens = <Widget>[
-      _Pilula('📍 ${area.emoji} ${area.nome}${m.cidades > 0 ? ' · +${50 * m.cidades}%' : ''}', const [
-        Color(0xCC263238),
-        Color(0xCC37474F),
-      ]),
       if (a != null)
         Transform.translate(
           offset: Offset(tremer > 0 ? sin(tremer * 60) * 5 * tremer : 0, 0),
@@ -1521,8 +1519,8 @@ class _MiniMapa extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 112,
-    height: 64,
+    width: 96,
+    height: 56,
     decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(12)),
     child: CustomPaint(painter: _PintorMiniMapa(m, t)),
   );

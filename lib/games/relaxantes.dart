@@ -348,7 +348,16 @@ class _Peixe {
   Offset pos, vel;
   final String emoji;
   final double fase;
+  double satisfeito = 0; // segundos "digerindo" depois de comer (não come de novo na hora)
   _Peixe(this.pos, this.vel, this.emoji, this.fase);
+}
+
+/// Comida que cai devagar; só pode ser comida depois de afundar um pouco.
+class _Comida {
+  Offset pos;
+  double idade = 0;
+  _Comida(this.pos);
+  bool get pronta => idade >= 0.5;
 }
 
 class AquarioScreen extends StatefulWidget {
@@ -361,7 +370,7 @@ class AquarioScreen extends StatefulWidget {
 class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProviderStateMixin {
   final _rnd = Random();
   final _peixes = <_Peixe>[];
-  final _comida = <Offset>[];
+  final _comida = <_Comida>[];
   final _bolhas = <Offset>[];
   final _pintor = PintorEmoji();
   late final Ticker _ticker;
@@ -393,20 +402,42 @@ class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProvider
     final dt = ((agora - _ultimo).inMicroseconds / 1e6).clamp(0.0, 0.05);
     _ultimo = agora;
     _t += dt;
-    for (var i = 0; i < _comida.length; i++) {
-      _comida[i] = Offset(_comida[i].dx, min(0.95, _comida[i].dy + dt * 0.05));
+    for (final c in _comida) {
+      c
+        ..idade += dt
+        ..pos = Offset(c.pos.dx, min(0.95, c.pos.dy + dt * 0.05));
+    }
+    // cada peixe escolhe uma comida diferente (assim eles não se amontoam todos no mesmo lugar)
+    final reservada = <_Comida>{};
+    final ordem = [..._peixes]..sort((a, b) => a.satisfeito.compareTo(b.satisfeito));
+    final alvos = <_Peixe, _Comida?>{};
+    for (final p in ordem) {
+      _Comida? melhor;
+      if (p.satisfeito <= 0) {
+        for (final c in _comida) {
+          if (reservada.contains(c)) continue;
+          if (melhor == null || (c.pos - p.pos).distance < (melhor.pos - p.pos).distance) melhor = c;
+        }
+      }
+      if (melhor != null) reservada.add(melhor);
+      alvos[p] = melhor;
     }
     for (final p in _peixes) {
-      Offset alvo;
-      if (_comida.isNotEmpty) {
-        alvo = _comida.reduce((a, b) => (a - p.pos).distance < (b - p.pos).distance ? a : b);
-      } else {
-        alvo = Offset(p.pos.dx + p.vel.dx, 0.5 + 0.3 * sin(_t * 0.3 + p.fase));
-      }
+      p.satisfeito = max(0, p.satisfeito - dt);
+      final comida = alvos[p];
+      final alvo = comida?.pos ?? Offset(p.pos.dx + p.vel.dx, 0.5 + 0.3 * sin(_t * 0.3 + p.fase));
       final dir = alvo - p.pos;
       final dist = dir.distance;
-      final velMax = _comida.isNotEmpty ? 0.18 : 0.06;
-      if (dist > 0.001) p.vel = Offset.lerp(p.vel, dir / dist * velMax, dt * 1.5)!;
+      final velMax = comida != null ? 0.16 : 0.06;
+      var desejo = dist > 0.001 ? dir / dist * velMax : p.vel;
+      // espaço pessoal: afasta dos outros peixes muito perto
+      for (final o in _peixes) {
+        if (identical(o, p)) continue;
+        final d = p.pos - o.pos;
+        final dd = d.distance;
+        if (dd > 0.0001 && dd < 0.12) desejo += d / dd * (0.12 - dd) * 1.6;
+      }
+      p.vel = Offset.lerp(p.vel, desejo, dt * 1.5)!;
       p.pos += p.vel * dt;
       if (p.pos.dx < 0.05 || p.pos.dx > 0.95) {
         p.vel = Offset(-p.vel.dx, p.vel.dy);
@@ -414,7 +445,8 @@ class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProvider
       }
       p.pos = Offset(p.pos.dx, p.pos.dy.clamp(0.08, 0.92));
       _comida.removeWhere((c) {
-        if ((c - p.pos).distance < 0.04) {
+        if (p.satisfeito <= 0 && c.pronta && (c.pos - p.pos).distance < 0.045) {
+          p.satisfeito = 2.5;
           _alimentados++;
           _bolhas.add(p.pos);
           _comeu(p);
@@ -457,12 +489,12 @@ class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProvider
   }
 
   void _alimentar(Offset p, Size s) {
+    if (_comida.length >= 12) return; // água cheia de comida: espera os peixes comerem
     Musica.efeito(Efeito.aqPlop);
     HapticFeedback.selectionClick();
-    for (var i = 0; i < 3; i++) {
-      _comida.add(Offset(p.dx / s.width + (_rnd.nextDouble() - 0.5) * 0.06, p.dy / s.height));
+    for (var i = 0; i < 2; i++) {
+      _comida.add(_Comida(Offset(p.dx / s.width + (_rnd.nextDouble() - 0.5) * 0.06, p.dy / s.height)));
     }
-    if (_comida.length > 30) _comida.removeRange(0, _comida.length - 30);
   }
 
   @override
@@ -526,7 +558,7 @@ class _PintorAquario extends CustomPainter {
     }
     final comida = Paint()..color = const Color(0xFFE0A458);
     for (final f in e._comida) {
-      c.drawCircle(Offset(f.dx * s.width, f.dy * s.height), 4, comida);
+      c.drawCircle(Offset(f.pos.dx * s.width, f.pos.dy * s.height), 4, comida);
     }
     for (final p in e._peixes) {
       final pos = Offset(p.pos.dx * s.width, p.pos.dy * s.height);

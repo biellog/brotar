@@ -222,6 +222,12 @@ class PintorMundo extends CustomPainter {
 
   void _rotulo(Offset p, String s, double tam, Color cor, {Color? fundo}) => _rotulos.add(_Rotulo(p, s, tam, cor, fundo));
 
+  /// Tela limpa: a maioria dos textos só aparece quando você chega perto.
+  bool _perto(double x, double y, [double r = 3]) {
+    final dx = m.jogador.x - x, dy = m.jogador.y - y;
+    return dx * dx + dy * dy < r * r;
+  }
+
   // ---------------- primitivas ----------------
   void _poligono(Canvas c, List<Offset> pts, Paint p) => c.drawPath(Path()..addPolygon(pts, true), p);
 
@@ -447,7 +453,9 @@ class PintorMundo extends CustomPainter {
         ..strokeWidth = 2
         ..color = const Color(0xFFFFC23D).withValues(alpha: 0.7),
     );
-    _rotulo(_iso.p((x0 + x1) / 2, y0 + 0.2, 0.05), '💻 GERÊNCIA', 12, Colors.white, fundo: const Color(0xCC1E3A6E));
+    if (_perto((x0 + x1) / 2, (y0 + y1) / 2, 4.5)) {
+      _rotulo(_iso.p((x0 + x1) / 2, y0 + 0.2, 0.05), '💻 GERÊNCIA', 12, Colors.white, fundo: const Color(0xCC1E3A6E));
+    }
   }
 
   /// Árvore fica transparente quando está perto de você ou de uma placa.
@@ -527,7 +535,7 @@ class PintorMundo extends CustomPainter {
     _caixa(c, x, y, 0.5, 0.5, 0.25, 0.08, const Color(0xFF212121), topo: const Color(0xFF37474F), bordas: 0);
     _caixa(c, x + 0.2, y + 0.2, 0.1, 0.1, 0, 0.25, const Color(0xFF424242), bordas: 0);
     _caixa(c, x, y, 0.06, 0.5, 0.33, 0.45, const Color(0xFF263238), bordas: 0); // encosto
-    if (!m.sentado) {
+    if (!m.sentado && _perto(cadeira.x, cadeira.y, 3.5)) {
       final p = _iso.p(cadeira.x, cadeira.y, 1.2 + 0.08 * sin(t * 4));
       _rotulo(p, '💻 Sente aqui', 12, Colors.white, fundo: const Color(0xCC1565C0));
     }
@@ -586,13 +594,15 @@ class PintorMundo extends CustomPainter {
     c.drawCircle(topo, _iso.tw * 0.32, Paint()..color = Colors.white.withValues(alpha: 0.35));
     pintor.desenhar(c, b.suco.emoji, _iso.tw * 0.5, topo);
     final cheia = b.estoque >= m.capacidadeBarraca(b);
-    _rotulo(
-      _iso.p(b.x, b.y, 1.75),
-      '${b.estoque}/${m.capacidadeBarraca(b)} · nv ${b.nivel}',
-      11,
-      cheia ? const Color(0xFFFFE08A) : Colors.white,
-      fundo: Colors.black54,
-    );
+    if (_perto(b.x + 1, b.y, 2.4)) {
+      _rotulo(
+        _iso.p(b.x, b.y, 1.75),
+        '${b.estoque}/${m.capacidadeBarraca(b)} · nv ${b.nivel}',
+        11,
+        cheia ? const Color(0xFFFFE08A) : Colors.white,
+        fundo: Colors.black54,
+      );
+    }
   }
 
   void _copo(Canvas c, Offset base, Color cor, double w) {
@@ -618,7 +628,7 @@ class PintorMundo extends CustomPainter {
     pintor.desenhar(c, '💰', _iso.tw * 0.3, _iso.p(balcao.x + balcao.w - 0.38, balcao.y + 0.38, 1.4));
     _rotulo(
       _iso.p(balcao.x + balcao.w / 2, balcao.y + balcao.d, 0.4),
-      'CAIXA · ENTREGUE AQUI',
+      _perto(balcao.x + balcao.w / 2, balcao.y + 1, 4.5) ? 'CAIXA · ENTREGUE AQUI' : 'CAIXA',
       10,
       Colors.white,
       fundo: const Color(0xCC5D4037),
@@ -686,9 +696,14 @@ class PintorMundo extends CustomPainter {
         fundo: const Color(0xDD1E3A6E),
       );
     }
-    final nome = pl.tipo == TipoPlaca.abrir
-        ? 'Abrir ${sucos[pl.alvo].nome}'
-        : '${sucos[pl.alvo].emoji} nv ${m.barracas[pl.alvo].nivel + 1}';
+    // preço só perto da placa (ou quando já dá para abrir uma barraca/área nova)
+    final daParaAbrir = pl.tipo != TipoPlaca.melhorar && m.dinheiro >= custo - pl.pago;
+    if (!_perto(pl.x, pl.y, 2.2) && !daParaAbrir) return;
+    final nome = switch (pl.tipo) {
+      TipoPlaca.abrir => 'Abrir ${sucos[pl.alvo].nome}',
+      TipoPlaca.melhorar => '${sucos[pl.alvo].emoji} nv ${m.barracas[pl.alvo].nivel + 1}',
+      TipoPlaca.area => 'Abrir ${Area.values[pl.alvo].emoji} ${Area.values[pl.alvo].nome}',
+    };
     _rotulo(
       ctr + Offset(0, _iso.th * (tam + 0.35)),
       '$nome · ${_curto(custo - pl.pago)}',
@@ -804,11 +819,11 @@ class PintorMundo extends CustomPainter {
     // pilha de copos (sem espelhar, por cima da cabeça)
     // uma pilha para cada suco (cada barraca tem seu espaço na mão)
     final cabecaTela = base + Offset(0, -pula - 43 * u);
-    final porSuco = m.cargaPorSuco(p);
+    final porSuco = m.cargaPorSuco(p).entries.take(5).toList(); // no máximo 5 pilhas de 4 (não tampa a tela)
     var coluna = 0;
-    for (final e in porSuco.entries) {
+    for (final e in porSuco) {
       final dx = (coluna - (porSuco.length - 1) / 2) * 12 * u;
-      final altura = min(e.value, 6);
+      final altura = min(e.value, 4);
       for (var k = 0; k < altura; k++) {
         final balanco = sin(t * 3 + k * 0.6 + coluna) * k * 0.5 * u;
         _copo(c, cabecaTela + Offset(dx + balanco, -14 * u - k * 9 * u), Color(sucos[e.key].cor), 10 * u);
@@ -1012,6 +1027,7 @@ class PintorMundo extends CustomPainter {
       _iso.p(q.x - 0.3, q.y + q.d + 0.3, 1.5),
     ], Paint()..color = const Color(0xFFB8934A));
     pintor.desenhar(c, '🥥', _iso.tw * 0.3, _iso.p(q.x + q.w / 2, q.y + 0.4, 2.05));
+    if (!_perto(q.x + q.w / 2, q.y + 1, 5)) return;
     _rotulo(
       _iso.p(q.x + q.w / 2, q.y + q.d, 0.4),
       'QUIOSQUE · 1,5x · ENTREGUE AQUI',
@@ -1044,6 +1060,7 @@ class PintorMundo extends CustomPainter {
     _sombra(c, d.x, d.y, 1.0);
     _caixa(c, d.x - 0.45, d.y - 0.35, 0.9, 0.7, 0, 0.55, const Color(0xFFA1887F), topo: const Color(0xFFFFB74D));
     pintor.desenhar(c, '🧺', _iso.tw * 0.35, _iso.p(d.x, d.y, 0.95));
+    if (m.jogador.frutas == 0 && !_perto(d.x, d.y, 4)) return;
     _rotulo(
       _iso.p(d.x, d.y, 1.5),
       m.jogador.frutas > 0 ? '🧺 ENTREGUE AS FRUTAS AQUI' : '🧺 DEPÓSITO',
