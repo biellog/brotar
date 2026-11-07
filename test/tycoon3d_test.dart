@@ -233,20 +233,59 @@ void main() {
     }
   });
 
-  test('placa só começa a cobrar depois de 5 s parado em cima', () {
+  test('placa só começa a cobrar depois de 2 s parado em cima', () {
+    expect(esperaPlaca, 2.0);
     final m = Mundo(Random(1))..dinheiro = 100;
     final placa = m.placas.firstWhere((p) => p.tipo == TipoPlaca.abrir);
     irPara(m, placa.x, placa.y);
-    esperar(m, esperaPlaca - 0.5);
+    esperar(m, esperaPlaca - 0.4);
     expect(m.dinheiro, 100); // ainda não cobrou
-    expect(m.jogador.naPlaca, greaterThan(3));
+    expect(m.jogador.naPlaca, greaterThan(esperaPlaca - 1));
     irPara(m, 9, 7); // saiu: o tempo zera
     expect(m.jogador.naPlaca, 0);
     irPara(m, placa.x, placa.y);
-    esperar(m, 2);
+    esperar(m, esperaPlaca * 0.5);
     expect(m.dinheiro, 100); // contou de novo do zero
-    esperar(m, 5);
+    esperar(m, 4);
     expect(m.barracas[1].aberta, isTrue);
+  });
+
+  test('cada barraca tem seu espaço na mão: um suco não lota o outro', () {
+    final m = Mundo(Random(1));
+    m.barracas[1].aberta = true;
+    for (final b in m.barracas.take(2)) {
+      b.estoque = m.capacidadeBarraca(b);
+    }
+    m.jogador.carga.addAll(List.filled(m.capacidade, 0)); // limonada no limite
+    final b = m.barracas[1];
+    m.jogador
+      ..x = b.x + 1.1
+      ..y = b.y;
+    esperar(m, 1);
+    expect(m.quantos(m.jogador, 1), greaterThan(0)); // ainda pegou laranja
+    expect(m.quantos(m.jogador, 0), m.capacidade);
+    // e a limonada não passa do limite dela
+    final l = m.barracas[0];
+    m.jogador
+      ..x = l.x + 1.1
+      ..y = l.y;
+    final antes = l.estoque;
+    esperar(m, 1);
+    expect(m.quantos(m.jogador, 0), m.capacidade);
+    expect(l.estoque, greaterThanOrEqualTo(antes));
+    expect(m.cargaPorSuco(m.jogador).keys.toList(), [0, 1]);
+  });
+
+  test('placas e obstáculos são guardados e refeitos quando algo muda', () {
+    final m = Mundo(Random(1));
+    final a = m.placas;
+    expect(identical(a, m.placas), isTrue); // mesma lista: não refaz à toa
+    m.barracas[1].aberta = true;
+    final b = m.placas;
+    expect(identical(a, b), isFalse);
+    expect(b.any((p) => p.tipo == TipoPlaca.melhorar && p.alvo == 1), isTrue);
+    m.areas.add(Area.praia);
+    expect(m.placas.any((p) => p.tipo == TipoPlaca.area && p.alvo == Area.praia.index), isFalse);
   });
 
   test('combo: vender seguido aumenta o preço (até x2) e zera se demorar', () {

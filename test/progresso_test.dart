@@ -63,6 +63,40 @@ void main() {
     expect(m.pontos(30), 1080);
   });
 
+  test('memória: 4 níveis com pares, grade e tempo para decorar diferentes', () {
+    expect(NivelMemoria.values.map((n) => n.nome), ['Fácil', 'Médio', 'Difícil', 'Impossível']);
+    for (final n in NivelMemoria.values) {
+      final m = MotorMemoria(Random(1), n);
+      expect(m.cartas.length, n.pares * 2);
+      expect(n.colunas * n.linhas, n.cartas); // grade fecha certinho
+      expect(m.cartas.toSet().length, n.pares);
+      for (final s in m.cartas.toSet()) {
+        expect(m.cartas.where((c) => c == s).length, 2);
+      }
+    }
+    expect(NivelMemoria.impossivel.pares, greaterThan(NivelMemoria.dificil.pares));
+    expect(NivelMemoria.impossivel.segundosPrevia, lessThan(NivelMemoria.facil.segundosPrevia));
+  });
+
+  test('memória: nível mais difícil vale mais pontos', () {
+    int jogarPerfeito(NivelMemoria n) {
+      final m = MotorMemoria(Random(2), n);
+      for (final s in m.cartas.toSet()) {
+        final idx = [for (var i = 0; i < m.cartas.length; i++) if (m.cartas[i] == s) i];
+        m.virar(idx[0]);
+        m.virar(idx[1]);
+      }
+      expect(m.terminou, isTrue);
+      return m.pontos(40);
+    }
+
+    final pontos = [for (final n in NivelMemoria.values) jogarPerfeito(n)];
+    for (var k = 1; k < pontos.length; k++) {
+      expect(pontos[k], greaterThan(pontos[k - 1]));
+    }
+    expect(MotorMemoria(Random(1)).virar(99), isNull); // fora da grade
+  });
+
   test('memória: erro desvira', () {
     final m = MotorMemoria(Random(5));
     final a = 0;

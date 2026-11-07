@@ -253,6 +253,45 @@ def rodada():
     return x
 
 
+# ---------------- 🐠 Aquário da Calma ----------------
+def plop():
+    """Comida caindo na água: 'ploc' com o tom descendo e um respingo suave."""
+    tt = t(0.32)
+    f = 900 * np.exp(-tt * 14) + 180
+    fase = 2 * np.pi * np.cumsum(f) / SR
+    gota = env(np.sin(fase), 0.001, 13)
+    respingo = passa_baixa(ruido_agudo(0.32, 26), 3500) * 0.25
+    return gota + respingo
+
+
+def nhac():
+    """Peixinho mastigando: três mordidinhas crocantes ('nhac nhac nhac')."""
+    x = np.zeros(int(0.42 * SR))
+    for k, (ini, tom) in enumerate([(0.0, 1.0), (0.12, 0.92), (0.25, 1.05)]):
+        tt = t(0.09)
+        crec = passa_baixa(rng.standard_normal(len(tt)), 2400 * tom) * np.exp(-tt * 45)
+        boca = np.sin(2 * np.pi * (230 * tom + 120 * np.exp(-tt * 30)) * tt) * np.exp(-tt * 38)
+        colocar(x, (crec * 0.7 + boca) * (1 - 0.15 * k), ini)
+    return x
+
+
+def bolha():
+    """Bolhinha subindo: 'blup' com o tom subindo."""
+    tt = t(0.14)
+    f = 320 + 1300 * (tt / tt[-1]) ** 1.6
+    fase = 2 * np.pi * np.cumsum(f) / SR
+    return env(np.sin(fase) * np.sin(np.pi * tt / tt[-1]), 0.004, 4)
+
+
+def feliz():
+    """Peixes felizes: três notas de bolha em arpejo (a cada 10 petiscos)."""
+    x = np.zeros(int(0.9 * SR))
+    for k, m in enumerate([76, 81, 85, 88]):
+        colocar(x, sino(hz(m), 0.6, 6, 0.4) * 0.5, k * 0.09)
+        colocar(x, bolha() * 0.25, k * 0.09)
+    return x
+
+
 if __name__ == "__main__":
     pasta = sys.argv[1]
     for nome, fn in [("ty_moeda", moeda), ("ty_caixa", caixa), ("ty_compra", compra), ("ty_marco", marco),
@@ -261,6 +300,7 @@ if __name__ == "__main__":
                      ("ty_combo1", lambda: combo(0)), ("ty_combo2", lambda: combo(1)),
                      ("ty_combo3", lambda: combo(2)), ("ty_combo4", lambda: combo(3)),
                      ("br_luz1", lambda: luz(0)), ("br_luz2", lambda: luz(1)), ("br_luz3", lambda: luz(2)),
-                     ("br_dupla", dupla), ("br_rodada", rodada)]:
+                     ("br_dupla", dupla), ("br_rodada", rodada),
+                     ("aq_plop", plop), ("aq_nhac", nhac), ("aq_bolha", bolha), ("aq_feliz", feliz)]:
         salvar(nome, fn(), pasta)
         print(nome)

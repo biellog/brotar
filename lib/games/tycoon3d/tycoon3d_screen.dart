@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -89,6 +90,10 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
   final _poeiras = <_Poeira>[];
   bool _pc = false, _skills = false;
   double _tremer = 0;
+  // modo leve automático: se o celular não aguenta ~38 quadros por segundo, tira detalhes
+  bool _leve = false;
+  Duration? _ultimoReal;
+  double _mediaQuadro = 1 / 60, _tempoLento = 0;
   Area _areaAtual = Area.praca;
   int _abaPc = 0;
   final _inicio = DateTime.now();
@@ -109,12 +114,21 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
     super.initState();
     _ticker = createTicker(_tick);
     _ciclo = AppLifecycleListener(onHide: _salvar);
+    // no celular o jogo é deitado (tela de lado) e em tela cheia
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
     _carregar();
     Repo.log('jogo_iniciado', {'jogo': 'tycoon3d'});
   }
 
   @override
   void dispose() {
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations(const []);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _salvar(forcar: true);
     _rede?.sair();
     _ticker.dispose();
@@ -372,6 +386,13 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
   void _tick(Duration agora) {
     final dt = ((agora - _ultimo).inMicroseconds / 1e6).clamp(0.0, 0.05);
     _ultimo = agora;
+    if (!_leve && _t > 3) {
+      final real = (agora - (_ultimoReal ?? agora)).inMicroseconds / 1e6;
+      _mediaQuadro += (real - _mediaQuadro) * 0.05;
+      _tempoLento = _mediaQuadro > 1 / 38 ? _tempoLento + real : 0;
+      if (_tempoLento > 3) _leve = true;
+    }
+    _ultimoReal = agora;
     _t += dt;
     final (dx, dy) = direcaoNoMapa(_direcao.dx, _direcao.dy);
     final eventos = _m.passo(dt, dx, dy)..addAll(_eventosDeFora);
@@ -430,7 +451,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
             _joyOrigem = null;
             _pc = true;
           case TipoEvento.poeira:
-            _poeiras.add(_Poeira(iso.p(e.x, e.y) + Offset(_rnd.nextDouble() * 10 - 5, 0)));
+            if (!_leve) _poeiras.add(_Poeira(iso.p(e.x, e.y) + Offset(_rnd.nextDouble() * 10 - 5, 0)));
           case TipoEvento.combo:
             final nivel = e.valor < 1.25 ? 0 : (e.valor < 1.45 ? 1 : (e.valor < 1.75 ? 2 : 3));
             Musica.efeito([Efeito.tyCombo1, Efeito.tyCombo2, Efeito.tyCombo3, Efeito.tyCombo4][nivel]);
@@ -561,6 +582,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
   }
 
   void _confete(Offset p, int n) {
+    if (_leve) n = n ~/ 3;
     const cores = [Color(0xFFFFC23D), Color(0xFFFF4D8D), Color(0xFF4CC9F0), Color(0xFF7BD389), Color(0xFFB98CF0)];
     for (var k = 0; k < n; k++) {
       final a = _rnd.nextDouble() * 2 * pi;
@@ -650,7 +672,7 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                       _direcao = Offset.zero;
                     }),
                     child: CustomPaint(
-                      painter: PintorMundo(m: _m, t: _t, pintor: _pintor, joyOrigem: _joyOrigem, joyPonto: _joyPonto),
+                      painter: PintorMundo(m: _m, t: _t, pintor: _pintor, joyOrigem: _joyOrigem, joyPonto: _joyPonto, leve: _leve),
                       size: _tela,
                     ),
                   ),
@@ -703,7 +725,9 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                         ),
                       ),
                       const SizedBox(height: 6),
-                      _MissaoCompacta(m: _m),
+                      Center(
+                        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _MissaoCompacta(m: _m)),
+                      ),
                       _Pilulas(m: _m, tremer: _tremer),
                       const Spacer(),
                       Padding(
@@ -716,7 +740,10 @@ class _Tycoon3dScreenState extends State<Tycoon3dScreen> with SingleTickerProvid
                                 spacing: 6,
                                 runSpacing: 6,
                                 children: [
-                                  _Etiqueta('🥤 $carga/${_m.capacidade}', carga >= _m.capacidade ? _ouro : Colors.white),
+                                  if (carga == 0) _Etiqueta('🥤 0 · ${_m.capacidade} de cada', Colors.white),
+                                  for (final e in _m.cargaPorSuco(_m.jogador).entries)
+                                    _Etiqueta('${sucos[e.key].emoji} ${e.value}/${_m.capacidade}',
+                                        e.value >= _m.capacidade ? _ouro : Colors.white),
                                   _grupo
                                       ? _Etiqueta('👥 ${1 + _m.amigos.length}', Colors.white)
                                       : _Etiqueta('🧑‍🍳 ${_m.ajudantes.length}', Colors.white),

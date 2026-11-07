@@ -245,7 +245,7 @@ class Pessoa {
 }
 
 /// Segundos parado em cima da placa antes de começar a cobrar (evita compra sem querer).
-const esperaPlaca = 5.0;
+const esperaPlaca = 2.0;
 
 /// Agitos: acontecimentos surpresa na praça para o jogo nunca ficar parado.
 enum TipoAgito {
@@ -436,7 +436,27 @@ class Mundo {
   }
 
   // ---------------- placas (na frente das barracas) ----------------
+  /// As placas mudam pouco: a lista é guardada e só refeita quando algo muda (deixa o jogo leve).
+  List<Placa>? _placasCache;
+  String _placasChave = '';
+
+  String get _chaveMundo =>
+      '${barracas.map((b) => b.aberta ? b.nivel : 0).join(',')}|${areas.length}|${areas.map((a) => a.index).join()}|${pagos.length}';
+
   List<Placa> get placas {
+    final chave = _chaveMundo;
+    final cache = _placasCache;
+    if (cache != null && chave == _placasChave) {
+      for (final p in cache) {
+        p.pago = pagos[p.id] ?? 0;
+      }
+      return cache;
+    }
+    _placasChave = chave;
+    return _placasCache = _montarPlacas();
+  }
+
+  List<Placa> _montarPlacas() {
     final l = <Placa>[];
     final prox = barracas.where((b) => !b.aberta).firstOrNull;
     if (prox != null) l.add(Placa(TipoPlaca.abrir, prox.indice, xPlacas, prox.y));
@@ -650,7 +670,19 @@ class Mundo {
   }
 
   // ---------------- colisão ----------------
-  List<(double, double, double, double)> get _solidos => [
+  List<(double, double, double, double)>? _solidosCache;
+  String _solidosChave = '';
+
+  List<(double, double, double, double)> get _solidos {
+    final chave = '${barracas.where((b) => b.aberta).length}|${areas.length}|${areas.map((a) => a.index).join()}';
+    if (_solidosCache == null || chave != _solidosChave) {
+      _solidosChave = chave;
+      _solidosCache = _montarSolidos();
+    }
+    return _solidosCache!;
+  }
+
+  List<(double, double, double, double)> _montarSolidos() => [
     for (final b in barracas.where((b) => b.aberta)) (b.x - 0.7, b.y - 0.7, 1.4, 1.4),
     (balcao.x, balcao.y, balcao.w, balcao.d),
     (mesa.x, mesa.y, mesa.w, mesa.d),
@@ -1192,7 +1224,8 @@ class Mundo {
         final v = min(ritmo, min(dinheiro, c - pl.pago));
         dinheiro -= v;
         pagos[pl.id] = pl.pago + v;
-        if (pl.pago + v >= c - 1e-6) eventos.add(_aplicarPlaca(pl));
+        pl.pago += v;
+        if (pl.pago >= c - 1e-6) eventos.add(_aplicarPlaca(pl));
       }
     }
   }
@@ -1222,10 +1255,11 @@ class Mundo {
   List<Evento> _pegar(Pessoa p, double dt) {
     p.pegarEm -= dt;
     if (p.pegarEm > 0) return const [];
-    final cap = p.ajudante ? 3 : capacidade;
-    if (p.carga.length >= cap) return const [];
+    // ajudante leva até 3 no total; você tem um espaço separado para cada suco
+    if (p.ajudante && p.carga.length >= 3) return const [];
     for (final b in barracas.where((b) => b.aberta && b.estoque > 0)) {
       if (p.ajudante && p.alvoBarraca != b.indice) continue;
+      if (!p.ajudante && quantos(p, b.indice) >= capacidade) continue;
       if (p.x - b.x < 1.45 && p.x > b.x && (b.y - p.y).abs() < 0.9) {
         b.estoque--;
         p.carga.add(b.indice);
@@ -1234,6 +1268,18 @@ class Mundo {
       }
     }
     return const [];
+  }
+
+  /// Quantos copos do suco [s] a pessoa está carregando.
+  int quantos(Pessoa p, int s) => p.carga.where((c) => c == s).length;
+
+  /// Os sucos que você carrega, com quantidade (para o painel: 🍋 3/6 · 🍊 1/6).
+  Map<int, int> cargaPorSuco(Pessoa p) {
+    final m = <int, int>{};
+    for (final c in p.carga) {
+      m[c] = (m[c] ?? 0) + 1;
+    }
+    return Map.fromEntries(m.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
   }
 
   bool _pertoDoBalcao(Pessoa p) =>

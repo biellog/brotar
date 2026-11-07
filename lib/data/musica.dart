@@ -35,7 +35,12 @@ enum Efeito {
   brLuz2('sons/br_luz2.ogg'),
   brLuz3('sons/br_luz3.ogg'),
   brDupla('sons/br_dupla.ogg'),
-  brRodada('sons/br_rodada.ogg');
+  brRodada('sons/br_rodada.ogg'),
+  // Aquário da Calma
+  aqPlop('sons/aq_plop.ogg'), // comida caiu na água
+  aqNhac('sons/aq_nhac.ogg'), // peixinho mastigando
+  aqBolha('sons/aq_bolha.ogg'), // bolhinha subindo
+  aqFeliz('sons/aq_feliz.ogg'); // a cada 10 petiscos
 
   final String arquivo;
   const Efeito(this.arquivo);
@@ -89,7 +94,7 @@ class Musica {
       // sons rápidos e repetidos ganham 3 "vozes"; os raros, 2
       const frequentes = {Efeito.tyMoeda, Efeito.plastico, Efeito.bolhaCerta, Efeito.carta, Efeito.tyToque,
           Efeito.tyCombo1, Efeito.tyCombo2, Efeito.tyCombo3, Efeito.tyCombo4,
-          Efeito.brLuz1, Efeito.brLuz2, Efeito.brLuz3};
+          Efeito.brLuz1, Efeito.brLuz2, Efeito.brLuz3, Efeito.aqPlop, Efeito.aqNhac, Efeito.aqBolha};
       final vozes = frequentes.contains(e) ? 3 : 2;
       for (var i = 0; i < vozes; i++) {
         final p = AudioPlayer(playerId: '${e.name}_$i');

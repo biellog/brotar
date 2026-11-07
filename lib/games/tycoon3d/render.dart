@@ -51,14 +51,22 @@ class PintorMundo extends CustomPainter {
   final double t;
   final PintorEmoji pintor;
   final Offset? joyOrigem, joyPonto;
-  PintorMundo({required this.m, required this.t, required this.pintor, this.joyOrigem, this.joyPonto});
+
+  /// Modo leve (celulares mais fracos): sem sombras e com menos detalhes animados.
+  final bool leve;
+  PintorMundo({required this.m, required this.t, required this.pintor, this.joyOrigem, this.joyPonto, this.leve = false});
+
+  /// Textos já medidos (medir texto a cada quadro pesa muito em celular fraco).
+  static final _cacheTexto = <String, TextPainter>{};
+  static Shader? _ceu;
+  static Size _tamCeu = Size.zero;
 
   late Iso _iso;
   final _rotulos = <_Rotulo>[];
 
   /// Projeção usada na tela (a câmera segue o jogador).
   static Iso isoPara(Size s, Mundo m) {
-    final tw = max(58.0, s.width / 6.2);
+    final tw = max(58.0, s.shortestSide / 6.2);
     final foco = Iso(tw, Offset.zero).p(m.jogador.x, m.jogador.y);
     return Iso(tw, Offset(s.width / 2, s.height * 0.55) - foco);
   }
@@ -77,15 +85,15 @@ class PintorMundo extends CustomPainter {
     _iso = isoPara(s, m);
     _tam = s;
     _rotulos.clear();
-    c.drawRect(
-      Offset.zero & s,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF7EC8F2), Color(0xFFCDEBFA)],
-        ).createShader(Offset.zero & s),
-    );
+    if (_ceu == null || _tamCeu != s) {
+      _tamCeu = s;
+      _ceu = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF7EC8F2), Color(0xFFCDEBFA)],
+      ).createShader(Offset.zero & s);
+    }
+    c.drawRect(Offset.zero & s, Paint()..shader = _ceu);
     _ilha(c);
     _chao(c);
     _escritorioChao(c);
@@ -247,6 +255,7 @@ class PintorMundo extends CustomPainter {
   }
 
   void _sombra(Canvas c, double x, double y, double raio) {
+    if (leve) return;
     c.drawOval(
       Rect.fromCenter(center: _iso.p(x, y), width: _iso.tw * raio, height: _iso.th * raio),
       Paint()..color = Colors.black.withValues(alpha: 0.22),
@@ -254,18 +263,22 @@ class PintorMundo extends CustomPainter {
   }
 
   void _texto(Canvas c, String s, Offset centro, double tam, Color cor, {Color? fundo}) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: s,
-        style: TextStyle(
-          fontSize: tam,
-          fontWeight: FontWeight.w900,
-          color: cor,
-          shadows: fundo == null ? const [Shadow(blurRadius: 3, color: Colors.black54)] : null,
+    if (_cacheTexto.length > 400) _cacheTexto.clear();
+    final tp = _cacheTexto.putIfAbsent(
+      '$s|${tam.toStringAsFixed(1)}|${cor.toARGB32()}|${fundo == null}',
+      () => TextPainter(
+        text: TextSpan(
+          text: s,
+          style: TextStyle(
+            fontSize: tam,
+            fontWeight: FontWeight.w900,
+            color: cor,
+            shadows: fundo == null ? const [Shadow(blurRadius: 3, color: Colors.black54)] : null,
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
     if (fundo != null) {
       c.drawRRect(
         RRect.fromRectAndRadius(
@@ -333,7 +346,7 @@ class PintorMundo extends CustomPainter {
         cor = y % 5 == 2 ? const Color(0xFFC9A66B) : (par ? const Color(0xFF6DBE5A) : const Color(0xFF63B350));
       case Area.praia:
         if (x + 0.5 >= marX) {
-          final onda = 0.5 + 0.5 * sin(t * 2 + x * 0.8 + y * 0.6);
+          final onda = leve ? 0.5 : ((0.5 + 0.5 * sin(t * 2 + x * 0.8 + y * 0.6)) * 4).round() / 4;
           cor = Color.lerp(const Color(0xFF29B6F6), const Color(0xFF4FC3F7), onda)!;
         } else if (x + 1.5 >= marX) {
           cor = par ? const Color(0xFFE6C88E) : const Color(0xFFDDBE82); // areia molhada
@@ -348,16 +361,21 @@ class PintorMundo extends CustomPainter {
 
   void _chao(Canvas c) {
     final i = _iso;
+    // junta os quadradinhos da mesma cor num desenho só (muito menos trabalho por quadro)
+    final porCor = <int, Path>{};
     for (var x = 0; x < larguraMapa; x++) {
       for (var y = 0; y < alturaMapa; y++) {
         if (!_naTela(i.p(x + 0.5, y + 0.5))) continue;
-        _poligono(c, [
+        porCor.putIfAbsent(_corPiso(x, y).toARGB32(), Path.new).addPolygon([
           i.p(x * 1.0, y * 1.0),
           i.p(x + 1.0, y * 1.0),
           i.p(x + 1.0, y + 1.0),
           i.p(x * 1.0, y + 1.0),
-        ], Paint()..color = _corPiso(x, y));
+        ], true);
       }
+    }
+    for (final e in porCor.entries) {
+      c.drawPath(e.value, Paint()..color = Color(e.key));
     }
     final faixa = Paint()
       ..strokeWidth = 3
@@ -447,17 +465,11 @@ class PintorMundo extends CustomPainter {
     _caixa(c, x - 0.08, y - 0.08, 0.16, 0.16, 0, 0.55, const Color(0xFF8B5A2B), bordas: 0);
     final topo = _iso.p(x, y, 1.05);
     final r = _iso.tw * 0.36;
+    final escuro = Paint()..color = const Color(0xFF3E8E41), claro = Paint()..color = const Color(0xFF6CC15A);
     for (final (dx, dy, k) in [(0.0, 0.0, 1.0), (-0.45, 0.25, 0.75), (0.45, 0.25, 0.75), (0.0, -0.4, 0.8)]) {
       final ctr = topo + Offset(dx * r, dy * r);
-      c.drawCircle(
-        ctr,
-        r * k,
-        Paint()
-          ..shader = const RadialGradient(
-            center: Alignment(-0.35, -0.45),
-            colors: [Color(0xFF8BD66F), Color(0xFF3E8E41)],
-          ).createShader(Rect.fromCircle(center: ctr, radius: r * k)),
-      );
+      c.drawCircle(ctr, r * k, escuro);
+      c.drawCircle(ctr - Offset(r * k * 0.18, r * k * 0.2), r * k * 0.72, claro);
     }
     if (alfa < 1) c.restore();
   }
@@ -734,7 +746,7 @@ class PintorMundo extends CustomPainter {
     final tronco = Rect.fromCenter(center: Offset(0, -10 * u), width: 20 * u, height: 22 * u);
     c.drawRRect(
       RRect.fromRectAndRadius(tronco, Radius.circular(7 * u)),
-      Paint()..shader = LinearGradient(colors: [_claro(camisa, 0.2), _escuro(camisa, 0.15)]).createShader(tronco),
+      Paint()..color = camisa,
     );
     final carregando = p.carga.isNotEmpty || sentado;
     final braco = Paint()
@@ -790,19 +802,18 @@ class PintorMundo extends CustomPainter {
     c.restore();
     c.restore();
     // pilha de copos (sem espelhar, por cima da cabeça)
+    // uma pilha para cada suco (cada barraca tem seu espaço na mão)
     final cabecaTela = base + Offset(0, -pula - 43 * u);
-    for (var k = 0; k < p.carga.length; k++) {
-      final balanco = sin(t * 3 + k * 0.6) * k * 0.5 * u;
-      _copo(c, cabecaTela - Offset(-balanco, 14 * u + k * 11 * u), Color(sucos[p.carga[k]].cor), 11 * u);
-    }
-    if (eu && p.carga.length >= m.capacidade && !sentado) {
-      _rotulo(
-        cabecaTela - Offset(0, 24 * u + p.carga.length * 11 * u),
-        'CHEIO!',
-        11,
-        const Color(0xFFFFE08A),
-        fundo: Colors.black54,
-      );
+    final porSuco = m.cargaPorSuco(p);
+    var coluna = 0;
+    for (final e in porSuco.entries) {
+      final dx = (coluna - (porSuco.length - 1) / 2) * 12 * u;
+      final altura = min(e.value, 6);
+      for (var k = 0; k < altura; k++) {
+        final balanco = sin(t * 3 + k * 0.6 + coluna) * k * 0.5 * u;
+        _copo(c, cabecaTela + Offset(dx + balanco, -14 * u - k * 9 * u), Color(sucos[e.key].cor), 10 * u);
+      }
+      coluna++;
     }
   }
 
@@ -1017,15 +1028,8 @@ class PintorMundo extends CustomPainter {
     _caixa(c, x - 0.1, y - 0.1, 0.2, 0.2, 0, 0.6, const Color(0xFF795548), bordas: 0);
     final topo = _iso.p(x, y, 1.15);
     final r = _iso.tw * 0.42;
-    c.drawCircle(
-      topo,
-      r,
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.3, -0.4),
-          colors: [Color(0xFF9CCC65), Color(0xFF2E7D32)],
-        ).createShader(Rect.fromCircle(center: topo, radius: r)),
-    );
+    c.drawCircle(topo, r, Paint()..color = const Color(0xFF2E7D32));
+    c.drawCircle(topo - Offset(r * 0.18, r * 0.2), r * 0.74, Paint()..color = const Color(0xFF7CB342));
     const pos = [Offset(-0.45, -0.1), Offset(0.35, -0.35), Offset(0.15, 0.35)];
     for (var k = 0; k < frutas && k < pos.length; k++) {
       final o = topo + pos[k] * r;

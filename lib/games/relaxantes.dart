@@ -369,6 +369,8 @@ class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProvider
   double _t = 0;
   int _alimentados = 0;
   var _inicio = DateTime.now();
+  double _ultimoNhac = -1, _ultimaBolha = 0;
+  final _nhacs = <(Offset, double)>[]; // "nhac!" que aparece onde o peixe comeu
 
   @override
   void initState() {
@@ -415,6 +417,7 @@ class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProvider
         if ((c - p.pos).distance < 0.04) {
           _alimentados++;
           _bolhas.add(p.pos);
+          _comeu(p);
           return true;
         }
         return false;
@@ -424,12 +427,37 @@ class _AquarioScreenState extends State<AquarioScreen> with SingleTickerProvider
       _bolhas[i] = Offset(_bolhas[i].dx + sin(_t * 3 + i) * 0.001, _bolhas[i].dy - dt * 0.12);
     }
     _bolhas.removeWhere((b) => b.dy < 0);
-    if (_rnd.nextDouble() < dt * 0.8) _bolhas.add(Offset(0.1 + _rnd.nextDouble() * 0.8, 1));
+    if (_rnd.nextDouble() < dt * 0.8) {
+      _bolhas.add(Offset(0.1 + _rnd.nextDouble() * 0.8, 1));
+      // de vez em quando, o "blup" de uma bolha subindo
+      if (_t - _ultimaBolha > 2.5 && _rnd.nextDouble() < 0.35) {
+        _ultimaBolha = _t;
+        Musica.efeito(Efeito.aqBolha);
+      }
+    }
+    for (var i = 0; i < _nhacs.length; i++) {
+      _nhacs[i] = (_nhacs[i].$1, _nhacs[i].$2 - dt * 1.4);
+    }
+    _nhacs.removeWhere((n) => n.$2 <= 0);
     setState(() {});
   }
 
+  /// Peixe comeu: som de mastigar (sem empilhar quando vários comem juntos) e "nhac!" na tela.
+  void _comeu(_Peixe p) {
+    if (_t - _ultimoNhac > 0.18) {
+      _ultimoNhac = _t;
+      Musica.efeito(Efeito.aqNhac);
+      HapticFeedback.lightImpact();
+      _nhacs.add((p.pos, 1.0));
+    }
+    if (_alimentados % 10 == 0) {
+      Musica.efeito(Efeito.aqFeliz);
+      HapticFeedback.mediumImpact();
+    }
+  }
+
   void _alimentar(Offset p, Size s) {
-    Musica.efeito(Efeito.bolhaCerta);
+    Musica.efeito(Efeito.aqPlop);
     HapticFeedback.selectionClick();
     for (var i = 0; i < 3; i++) {
       _comida.add(Offset(p.dx / s.width + (_rnd.nextDouble() - 0.5) * 0.06, p.dy / s.height));
@@ -507,6 +535,21 @@ class _PintorAquario extends CustomPainter {
       if (p.vel.dx > 0) c.scale(-1, 1); // emojis de peixe olham para a esquerda
       e._pintor.desenhar(c, p.emoji, 40, Offset.zero);
       c.restore();
+    }
+    // "nhac!" subindo onde o peixe comeu
+    for (final (pos, vida) in e._nhacs) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'nhac!',
+          style: TextStyle(
+            color: const Color(0xFFFFE08A).withValues(alpha: vida.clamp(0, 1)),
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(c, Offset(pos.dx * s.width - tp.width / 2, pos.dy * s.height - 34 - (1 - vida) * 30));
     }
     if (e._alimentados == 0 && e._comida.isEmpty) {
       final tp = TextPainter(
